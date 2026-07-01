@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar">
+  <div>
+    <p class="eyebrow"><a href="/" class="crumb">Video của tôi</a> / Video</p>
+    <h1 class="topbar-title">{{ v.prompt[:70] }}</h1>
+    <p class="topbar-sub">{{ v.aspect_ratio }} · {{ v.duration_seconds }}s</p>
+  </div>
+  <div class="render-actions">
+    {% if v.status == 'completed' %}
+    <a class="ghost-btn" href="/video/{{ v.id }}/download" download="reti-video-{{ v.id }}.mp4">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+      Tải về
+    </a>
+    {% endif %}
+    <a class="ghost-btn" href="/">Tạo video mới</a>
+  </div>
+</header>
+
+<div id="proc-banner" class="proc-banner{% if v.status == 'completed' %} hidden{% endif %}">
+  <span class="spinner" aria-hidden="true"></span>
+  <div class="proc-copy">
+    <strong id="proc-label">Đang tạo video…</strong>
+    <div class="progress"><div id="proc-bar" style="width: {{ v.progress or 4 }}%"></div></div>
+  </div>
+  <small>Video sẽ tự hiện khi hoàn tất.</small>
+</div>
+
+<section id="video-root" data-video-id="{{ v.id }}" data-ratio="{{ v.aspect_ratio }}" data-status="{{ v.status }}">
+  {% if v.status == 'completed' %}
+    <div class="player-wrap" data-ratio="{{ v.aspect_ratio }}">
+      <video class="player" controls playsinline preload="metadata" src="/video/{{ v.id }}/download"></video>
+    </div>
+  {% else %}
+    <div class="player-wrap placeholder" data-ratio="{{ v.aspect_ratio }}">
+      <span>Đang tạo video của bạn…</span>
+    </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Mô tả</h2>
+  <p class="prose">{{ v.prompt }}</p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const root = document.getElementById("video-root");
+  const videoId = root.dataset.videoId;
+  const done = root.dataset.status === "completed";
+  const bar = document.getElementById("proc-bar");
+  const label = document.getElementById("proc-label");
+  async function poll() {
+    if (done) return;
+    try {
+      const r = await fetch(`/api/video/${videoId}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const v = await r.json();
+      if (v.status === "completed") { location.reload(); return; }
+      const p = Math.max(4, Math.min(100, Number(v.progress || 0)));
+      if (bar) bar.style.width = p + "%";
+      if (label) label.textContent = v.status === "running" ? `Đang tạo video… ${p}%` : "Đang chờ trong hàng đợi…";
+    } catch (e) {}
+  }
+  if (!done) { poll(); setInterval(poll, 4000); }
+</script>
+{% endblock %}

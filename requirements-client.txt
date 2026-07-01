@@ -1,0 +1,10 @@
+# Thin client runtime deps (cross-platform). No AI/ffmpeg/moviepy.
+fastapi
+uvicorn
+httpx
+jinja2
+python-multipart
+pywebview
+# macOS webview backend (Cocoa/WebKit)
+pyobjc-framework-Cocoa; sys_platform == "darwin"
+pyobjc-framework-WebKit; sys_platform == "darwin"

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block foot %}
+<div class="quota-chip">
+  <strong>${{ '%.2f'|format(me.remaining) }}</strong>
+  <span>số dư còn lại</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <div>
+    <p class="eyebrow">RETI Studio</p>
+    <h1 class="topbar-title">Tạo video</h1>
+  </div>
+</header>
+
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+<section class="composer">
+  <div class="composer-glow" aria-hidden="true"></div>
+  <div class="tabs" role="tablist">
+    <button class="tab active" type="button" data-tab="text">Văn bản → Video</button>
+    <button class="tab" type="button" data-tab="image">Ảnh → Video</button>
+  </div>
+
+  <form class="composer-form tab-panel active" data-panel="text" action="/create" method="post">
+    <div class="prompt-box">
+      <textarea name="prompt" rows="3" required placeholder="Mô tả video bạn muốn tạo… Ví dụ: căn hộ cao cấp bên sông, ánh sáng hoàng hôn ấm áp, máy quay lướt nhẹ qua không gian sống hiện đại."></textarea>
+      <div class="prompt-toolbar">
+        <div class="chips">
+          <label class="chip">
+            <select name="aspect_ratio"><option value="16:9" selected>16:9 ngang</option><option value="9:16">9:16 dọc</option></select>
+          </label>
+          <label class="chip">
+            <select name="duration_seconds"><option value="15">15 giây</option><option value="30" selected>30 giây</option><option value="45">45 giây</option><option value="60">60 giây</option></select>
+          </label>
+          <label class="chip">
+            <select name="video_style"><option value="cinematic" selected>Điện ảnh</option><option value="luxury">Sang trọng</option><option value="modern">Hiện đại</option><option value="warm">Ấm áp</option><option value="minimal">Tối giản</option><option value="social">Mạng xã hội</option></select>
+          </label>
+        </div>
+        <div class="prompt-send">
+          <button class="generate-btn" type="submit">Tạo video
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <form class="composer-form tab-panel" data-panel="image" action="/create" method="post" enctype="multipart/form-data">
+    <label class="uploader">
+      <input name="images" type="file" multiple accept="image/jpeg,image/png,image/webp" required>
+      <span class="uploader-inner">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <strong>Kéo thả hoặc chọn ảnh</strong>
+        <small>JPG, PNG, WEBP</small>
+      </span>
+    </label>
+    <div class="prompt-box">
+      <textarea name="prompt" rows="3" required placeholder="Mô tả cách biến những bức ảnh này thành video…"></textarea>
+      <div class="prompt-toolbar">
+        <div class="chips">
+          <label class="chip">
+            <select name="aspect_ratio"><option value="9:16" selected>9:16 dọc</option><option value="16:9">16:9 ngang</option></select>
+          </label>
+          <label class="chip">
+            <select name="duration_seconds"><option value="15">15 giây</option><option value="30" selected>30 giây</option><option value="45">45 giây</option><option value="60">60 giây</option></select>
+          </label>
+          <label class="chip">
+            <select name="video_style"><option value="modern" selected>Hiện đại</option><option value="luxury">Sang trọng</option><option value="cinematic">Điện ảnh</option><option value="warm">Ấm áp</option><option value="minimal">Tối giản</option><option value="social">Mạng xã hội</option></select>
+          </label>
+        </div>
+        <div class="prompt-send">
+          <button class="generate-btn" type="submit">Tạo video
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-head"><h2>Video của tôi</h2><span class="count">{{ videos|length }} video</span></div>
+  {% if videos %}
+    <div class="video-grid">
+      {% for v in videos %}
+      <a class="video-card" href="/video/{{ v.id }}">
+        <div class="video-thumb" data-ratio="{{ v.aspect_ratio }}">
+          {% if v.status == 'completed' %}
+            <video class="thumb-video" muted playsinline preload="metadata" src="/video/{{ v.id }}/download#t=2.5"></video>
+            <span class="play-badge"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+          {% else %}
+            <span class="thumb-empty">{% if v.status in ['pending','running'] %}Đang xử lý… {{ v.progress }}%{% else %}Chưa sẵn sàng{% endif %}</span>
+          {% endif %}
+          <span class="ratio-chip">{{ v.aspect_ratio }} · {{ v.duration_seconds }}s</span>
+        </div>
+        <div class="video-meta">
+          <strong>{{ v.prompt[:60] }}</strong>
+          <span>{% if v.status == 'completed' %}Hoàn tất{% elif v.status in ['pending','running'] %}Đang xử lý{% else %}{{ v.status }}{% endif %}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
+      <p>Chưa có video nào. Nhập mô tả phía trên để tạo video đầu tiên.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const tabs = document.querySelectorAll(".tab");
+  const panels = document.querySelectorAll(".tab-panel");
+  tabs.forEach((tab) => tab.addEventListener("click", () => {
+    tabs.forEach((t) => t.classList.toggle("active", t === tab));
+    panels.forEach((p) => p.classList.toggle("active", p.dataset.panel === tab.dataset.tab));
+  }));
+  const uploader = document.querySelector(".uploader input[type=file]");
+  uploader?.addEventListener("change", () => {
+    const small = document.querySelector(".uploader small");
+    if (small) small.textContent = uploader.files.length ? `Đã chọn ${uploader.files.length} ảnh` : "JPG, PNG, WEBP";
+  });
+  // If any video is still processing, refresh the page periodically.
+  {% if videos %}
+  const anyProcessing = {{ 'true' if videos|selectattr('status','in',['pending','running'])|list else 'false' }};
+  if (anyProcessing) setTimeout(() => location.reload(), 5000);
+  {% endif %}
+</script>
+{% endblock %}

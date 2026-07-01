@@ -1,0 +1,55 @@
+name: Build macOS app
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'client/**'
+      - 'client_launcher.py'
+      - 'requirements-client.txt'
+      - 'packaging/reti_client_mac.spec'
+      - '.github/workflows/build-macos.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-client.txt
+          pip install pyinstaller
+
+      - name: Build .app
+        run: pyinstaller packaging/reti_client_mac.spec --noconfirm --clean
+
+      - name: Package .dmg
+        run: |
+          cd dist
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.1.0.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RETI-Studio-macOS-dmg
+          path: dist/RETI-Studio-1.1.0.dmg
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mac-v1.1.0
+          name: RETI Studio macOS 1.1.0
+          files: dist/RETI-Studio-1.1.0.dmg
+          body: |
+            Bản macOS (chưa ký số). Mở lần đầu bị Gatekeeper cảnh báo là bình thường:
+            - Chuột phải vào **RETI Studio.app** > **Open** > **Open**, hoặc
+            - Chạy: `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`

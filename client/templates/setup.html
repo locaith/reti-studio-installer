@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RETI Studio — Kích hoạt</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="setup-wrap">
+      <div class="setup-card">
+        <div class="brand" style="justify-content:center;margin-bottom:6px">
+          <span class="brand-mark">R</span>
+          <span class="brand-text">RETI <em>Studio</em></span>
+        </div>
+        <h1>Kích hoạt ứng dụng</h1>
+        <p class="lede" style="text-align:center;margin:0 0 20px">Nhập mã kích hoạt được cấp để bắt đầu tạo video AI.</p>
+        {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+        <form action="/setup" method="post" class="setup-form">
+          <label class="field">
+            <span>Mã kích hoạt</span>
+            <input name="token" type="text" autocomplete="off" required placeholder="Dán mã kích hoạt của bạn">
+          </label>
+          <button class="primary-btn" type="submit" style="width:100%;height:46px">Kích hoạt</button>
+        </form>
+        <p class="setup-note">Chưa có mã? Liên hệ RETI để được cấp quyền sử dụng.</p>
+      </div>
+    </div>
+  </body>
+</html>
