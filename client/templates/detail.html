@@ -1,347 +1,413 @@
-{% extends "base.html" %}
-{% block content %}
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ v.prompt[:40] }} — RETI Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  .tl-panel{margin-top:22px;background:linear-gradient(180deg,rgba(20,22,30,.72),rgba(14,15,20,.72));
-    border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:20px 20px 22px}
-  .tl-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
-  .tl-head h2{margin:0;font-size:16px;font-weight:700}
-  .tl-head small{color:#8b90a0}
-  .tl-strip{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 12px;scrollbar-width:thin}
-  .tl-strip::-webkit-scrollbar{height:8px}
-  .tl-strip::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px}
-  .tl-clip{flex:0 0 auto;width:200px;border-radius:14px;overflow:hidden;background:#0c0d12;
-    border:1px solid rgba(255,255,255,.08);position:relative;transition:border-color .2s}
-  .tl-clip:hover{border-color:rgba(255,70,87,.5)}
-  .tl-clip .thumb{position:relative;width:100%;aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center}
-  .tl-clip[data-ratio="9:16"] .thumb{aspect-ratio:9/16;max-height:220px;margin:0 auto}
-  .tl-clip video{width:100%;height:100%;object-fit:cover;display:block}
-  .tl-clip .pos{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.62);color:#fff;font-size:11px;
-    font-weight:700;padding:3px 8px;border-radius:20px;z-index:2}
-  .tl-clip .st{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:8px;color:#c9cdd8;font-size:12.5px;text-align:center;padding:10px}
-  .tl-clip .st .mini-spin{width:22px;height:22px;border:2.5px solid rgba(255,255,255,.18);
-    border-top-color:#ff4657;border-radius:50%;animation:spin .8s linear infinite}
-  .tl-clip .cap{padding:10px 12px;font-size:12px;color:#9aa0b0;line-height:1.4;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:44px}
-  .tl-clip.failed{border-color:rgba(255,90,90,.5)}
-  .tl-clip.failed .st{color:#ff8a8a}
-  .tl-add{flex:0 0 auto;width:150px;border-radius:14px;border:1.6px dashed rgba(255,255,255,.18);
-    background:rgba(255,255,255,.02);color:#c9cdd8;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:10px;cursor:pointer;font-weight:600;font-size:13px;transition:.2s;min-height:150px}
-  .tl-add:hover{border-color:#ff4657;color:#fff;background:rgba(255,70,87,.06)}
-  .tl-add .plus{width:42px;height:42px;border-radius:50%;background:rgba(255,70,87,.14);color:#ff6474;
-    display:flex;align-items:center;justify-content:center}
-  .extend-box{margin-top:16px;background:#0c0d12;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px}
-  .extend-box textarea{width:100%;background:transparent;border:0;color:#eef0f5;font-size:14px;resize:vertical;
-    min-height:56px;outline:none;font-family:inherit;line-height:1.5}
-  .extend-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px}
-  .extend-actions .hint{color:#7d8291;font-size:12px}
-  .extend-actions .btns{display:flex;gap:8px}
-  .extend-msg{color:#ff8a8a;font-size:12.5px;margin-top:8px;min-height:0}
-  .btn-primary{background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff;border:0;border-radius:10px;
-    padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-  .btn-primary:disabled{opacity:.55;cursor:not-allowed}
-  .btn-ghost{background:rgba(255,255,255,.06);color:#c9cdd8;border:0;border-radius:10px;padding:9px 14px;
-    font-weight:600;font-size:13px;cursor:pointer}
-  .stage-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:14px;background:radial-gradient(circle at 50% 40%,rgba(30,32,42,.6),rgba(8,9,12,.92));color:#eef0f5;text-align:center;padding:24px}
-  .stage-overlay .big-spin{width:46px;height:46px;border:3px solid rgba(255,255,255,.16);border-top-color:#ff4657;
-    border-radius:50%;animation:spin .9s linear infinite}
-  .stage-overlay .st-label{font-weight:600;font-size:15px}
-  .stage-overlay .st-pct{font-size:34px;font-weight:800;letter-spacing:-1px;
-    background:linear-gradient(135deg,#ff5a68,#ff9a4d);-webkit-background-clip:text;background-clip:text;color:transparent}
-  .stage-bar{width:min(360px,70%);height:7px;background:rgba(255,255,255,.1);border-radius:20px;overflow:hidden}
-  .stage-bar>i{display:block;height:100%;width:4%;border-radius:20px;
-    background:linear-gradient(90deg,#ff4657,#ff9a4d);transition:width .25s ease-out}
-  .stage-sub{color:#9aa0b0;font-size:12.5px}
-  .stage-overlay.failed{background:radial-gradient(circle at 50% 40%,rgba(50,20,24,.7),rgba(8,9,12,.94))}
-  .fail-icon{width:52px;height:52px;border-radius:50%;background:rgba(255,90,90,.14);color:#ff7a7a;
-    display:flex;align-items:center;justify-content:center;font-size:26px}
-  .fail-title{font-weight:700;font-size:16px;color:#fff}
-  .fail-msg{color:#c9a0a0;font-size:13px;max-width:440px}
-  .fail-actions{display:flex;gap:10px;margin-top:4px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#050505;--panel:#111214;--line:rgba(255,255,255,.08);--txt:#f2f3f5;--sub:#9aa0a6;--accent:#ff4657}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,sans-serif;overflow:hidden}
+  .editor{display:flex;flex-direction:column;height:100vh}
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  .icon-btn{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--sub);transition:.15s}
+  .icon-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+
+  /* Top bar */
+  .top{display:flex;align-items:center;gap:14px;padding:10px 16px;height:58px;flex:0 0 auto}
+  .top .title{font-size:15px;font-weight:600;outline:none;padding:4px 8px;border-radius:7px;max-width:40vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top .title:hover,.top .title:focus{background:rgba(255,255,255,.06)}
+  .top .spacer{flex:1}
+  .top .thumbs{display:flex;gap:6px;position:absolute;left:50%;transform:translateX(-50%)}
+  .top .thumbs img{width:34px;height:24px;object-fit:cover;border-radius:4px;border:1px solid var(--line)}
+  .pill{display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:20px;background:rgba(255,255,255,.08);font-size:13px;font-weight:500;color:var(--txt)}
+  .pill:hover{background:rgba(255,255,255,.13)}
+  .done{background:#fff;color:#111;font-weight:600;padding:8px 20px;border-radius:20px;font-size:13px}
+  .done:hover{background:#e9e9e9}
+
+  /* Body: stage + journal */
+  .body{flex:1;display:flex;min-height:0;padding:6px 16px 4px}
+  .stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;min-width:0}
+  .ratio-badge{position:absolute;left:6px;top:12px;color:var(--sub);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .ratio-badge .box{width:22px;height:16px;border:1.6px solid var(--sub);border-radius:3px}
+  .player-box{position:relative;background:#000;border-radius:10px;overflow:hidden;max-height:100%;max-width:100%;display:flex;align-items:center;justify-content:center}
+  .player-box video{display:block;max-height:62vh;max-width:100%;background:#000}
+  .player-box.r169 video{aspect-ratio:16/9;width:min(58vw,calc(62vh*16/9))}
+  .player-box.r916 video{aspect-ratio:9/16;height:62vh}
+  .transport{display:flex;align-items:center;gap:16px;margin-top:14px;color:var(--txt);font-variant-numeric:tabular-nums}
+  .transport .t{font-size:12.5px;color:var(--sub);min-width:64px;text-align:center}
+  .transport .play{width:44px;height:44px;border-radius:50%;background:#fff;color:#111;display:flex;align-items:center;justify-content:center}
+  .transport .play:hover{transform:scale(1.05)}
+  .transport .m{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+  .transport .m:hover{color:#fff;background:rgba(255,255,255,.08)}
+
+  /* Journal (right) */
+  .journal{width:300px;flex:0 0 auto;padding:6px 4px 6px 14px;overflow-y:auto;transition:.2s}
+  .journal.hidden{display:none}
+  .jcard{margin-bottom:16px}
+  .jcard .thumb{width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0c0d12;border:1px solid var(--line);position:relative}
+  .jcard .thumb video,.jcard .thumb canvas{width:100%;height:100%;object-fit:cover;display:block}
+  .jcard .thumb .st{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--sub);font-size:12px}
+  .jcard .thumb .badge{position:absolute;top:7px;left:7px;background:rgba(0,0,0,.6);border-radius:14px;padding:2px 8px;font-size:10.5px;font-weight:600}
+  .jcard .ptext{display:flex;gap:6px;margin-top:8px;font-size:12.5px;color:var(--sub);line-height:1.45}
+  .jcard .ptext p{flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .jcard .ptext.open p{-webkit-line-clamp:unset}
+  .jcard .ptext .chev{flex:0 0 auto;color:var(--sub);cursor:pointer;transition:.2s}
+  .mini-spin{width:20px;height:20px;border:2.4px solid rgba(255,255,255,.18);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Overlays on player */
+  .ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:radial-gradient(circle at 50% 40%,rgba(25,26,31,.55),rgba(4,4,5,.9));text-align:center;padding:22px}
+  .ov.hidden{display:none}
+  .ov .big-spin{width:44px;height:44px;border:3px solid rgba(255,255,255,.16);border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
+  .ov .pct{font-size:30px;font-weight:800;background:linear-gradient(135deg,#ff5a68,#ff9a4d);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .ov .lab{font-size:14px;font-weight:600}
+  .ov .bar{width:min(320px,70%);height:6px;background:rgba(255,255,255,.12);border-radius:20px;overflow:hidden}
+  .ov .bar>i{display:block;height:100%;width:4%;background:linear-gradient(90deg,#ff4657,#ff9a4d);border-radius:20px;transition:width .25s}
+  .ov .sub{font-size:12px;color:var(--sub)}
+  .ov.fail{background:radial-gradient(circle at 50% 40%,rgba(45,20,24,.6),rgba(4,4,5,.94))}
+  .ov .fi{width:48px;height:48px;border-radius:50%;background:rgba(255,90,90,.15);color:#ff7a7a;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+  .ov .facts{display:flex;gap:10px;margin-top:4px}
+  .btn-p{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff;border-radius:20px;padding:9px 18px;font-weight:600;font-size:13px}
+  .btn-g{background:rgba(255,255,255,.1);color:var(--txt);border-radius:20px;padding:9px 16px;font-weight:600;font-size:13px}
+
+  /* Timeline */
+  .tl{flex:0 0 auto;padding:2px 16px 6px;position:relative}
+  .tl-head{display:flex;justify-content:flex-end;gap:8px;padding:0 2px 4px}
+  .zoom-btn{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+  .zoom-btn:hover{background:rgba(255,255,255,.08);color:#fff}
+  .tl-scroll{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+  .tl-scroll::-webkit-scrollbar{height:8px}
+  .tl-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}
+  .tl-inner{position:relative;min-width:100%}
+  .ruler{position:relative;height:18px}
+  .ruler .tick{position:absolute;top:0;font-size:11px;color:var(--sub);transform:translateX(-2px)}
+  .ruler .tick::before{content:"";position:absolute;left:0;top:16px;width:1px;height:6px;background:rgba(255,255,255,.14)}
+  .film{position:relative;height:74px;display:flex;align-items:stretch;border-radius:8px;overflow:visible}
+  .film .seg{position:relative;height:74px;border-radius:8px;overflow:hidden;border:2px solid transparent;display:flex}
+  .film .seg.active{border-color:rgba(255,255,255,.85)}
+  .film .seg canvas,.film .seg img{height:100%;width:auto;display:block;object-fit:cover;pointer-events:none}
+  .film .seg .seglab{position:absolute;left:6px;top:5px;background:rgba(0,0,0,.55);border-radius:12px;padding:2px 8px;font-size:10px;font-weight:600;z-index:2}
+  .film .seg .segst{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0c0d12;color:var(--sub);font-size:12px}
+  .add-scene{flex:0 0 auto;width:64px;align-self:center;height:64px;margin-left:10px;border:1.6px dashed rgba(255,255,255,.22);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--sub);font-size:10.5px;transition:.15s}
+  .add-scene:hover{border-color:var(--accent);color:#fff;background:rgba(255,70,87,.07)}
+  .add-scene .plus{width:26px;height:26px;border-radius:50%;background:rgba(255,70,87,.16);color:#ff6474;display:flex;align-items:center;justify-content:center}
+  .playhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 6px rgba(255,255,255,.6);pointer-events:none;z-index:5}
+  .playhead::before{content:"";position:absolute;top:-2px;left:-5px;width:12px;height:12px;border-radius:50%;background:#fff}
+
+  /* Edit bar */
+  .editbar-wrap{flex:0 0 auto;display:flex;justify-content:center;padding:6px 16px 14px}
+  .editbar{width:min(680px,94%);display:flex;align-items:center;gap:10px;background:#1b1c1f;border:1px solid var(--line);border-radius:26px;padding:8px 8px 8px 8px}
+  .editbar .plus-in{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;color:var(--sub);flex:0 0 auto}
+  .editbar .plus-in:hover{background:rgba(255,255,255,.12);color:#fff}
+  .editbar input{flex:1;background:none;border:0;outline:none;color:var(--txt);font-size:14px}
+  .editbar input::placeholder{color:#6b7077}
+  .editbar .model{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub);padding:6px 12px;border-radius:16px;background:rgba(255,255,255,.05);flex:0 0 auto}
+  .editbar .send{width:38px;height:38px;border-radius:50%;background:#fff;color:#111;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .editbar .send:disabled{opacity:.4}
+  .emsg{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);color:#ff8a8a;font-size:12.5px}
+  .foot-note{text-align:center;font-size:11px;color:#565b61;padding-bottom:6px}
   .dl-menu{position:relative}
-  .dl-list{position:absolute;right:0;top:calc(100% + 6px);background:#15161d;border:1px solid rgba(255,255,255,.1);
-    border-radius:12px;padding:6px;min-width:190px;z-index:20;box-shadow:0 12px 30px rgba(0,0,0,.4)}
-  .dl-list a{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:8px;color:#dfe2ea;
-    font-size:13px;text-decoration:none}
+  .dl-list{position:absolute;right:0;top:calc(100% + 8px);background:#1b1c1f;border:1px solid var(--line);border-radius:12px;padding:6px;min-width:190px;z-index:40;box-shadow:0 14px 34px rgba(0,0,0,.5)}
+  .dl-list.hidden{display:none}
+  .dl-list a{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px}
   .dl-list a:hover{background:rgba(255,255,255,.07)}
-  .dl-list a small{color:#7d8291}
+  .dl-list a small{color:var(--sub)}
   .hidden{display:none !important}
 </style>
+</head>
+<body>
+<div class="editor" id="root"
+     data-video-id="{{ v.id }}" data-ratio="{{ v.aspect_ratio }}" data-status="{{ v.status }}"
+     data-progress="{{ v.progress or 4 }}">
 
-<header class="topbar">
-  <div>
-    <p class="eyebrow"><a href="/" class="crumb">Video của tôi</a> / Dòng thời gian</p>
-    <h1 class="topbar-title">{{ v.prompt[:70] }}</h1>
-    <p class="topbar-sub">{{ v.aspect_ratio }} · {{ v.duration_seconds }}s · {% if v.quality == 'high' %}Full HD 1080p{% else %}HD 720p{% endif %}</p>
-  </div>
-  <div class="render-actions">
+  <!-- TOP BAR -->
+  <header class="top">
+    <a class="icon-btn" href="/" title="Quay lại">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <div class="title" contenteditable spellcheck="false">{{ v.prompt[:40] or 'Cảnh chưa đặt tên' }}</div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="fav" title="Yêu thích">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+    </button>
     <div class="dl-menu">
-      <button class="ghost-btn" id="dl-toggle" type="button" {% if v.status != 'completed' %}disabled{% endif %}>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
-        Tải về
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      <button class="icon-btn" id="dl-toggle" title="Tải về">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
       </button>
       <div class="dl-list hidden" id="dl-list">
-        <a href="/video/{{ v.id }}/download?quality=original" download="reti-video-{{ v.id }}.mp4">Bản gốc <small>chất lượng cao nhất</small></a>
-        <a href="/video/{{ v.id }}/download?quality=1080" download="reti-video-{{ v.id }}-1080p.mp4">Full HD <small>1080p</small></a>
-        <a href="/video/{{ v.id }}/download?quality=720" download="reti-video-{{ v.id }}-720p.mp4">HD <small>720p</small></a>
-        <a href="/video/{{ v.id }}/download?quality=480" download="reti-video-{{ v.id }}-480p.mp4">Nhẹ <small>480p</small></a>
+        <a href="/video/{{ v.id }}/download?quality=original" download="reti-{{ v.id }}.mp4">Bản gốc <small>cao nhất</small></a>
+        <a href="/video/{{ v.id }}/download?quality=1080" download="reti-{{ v.id }}-1080p.mp4">Full HD <small>1080p</small></a>
+        <a href="/video/{{ v.id }}/download?quality=720" download="reti-{{ v.id }}-720p.mp4">HD <small>720p</small></a>
+        <a href="/video/{{ v.id }}/download?quality=480" download="reti-{{ v.id }}-480p.mp4">Nhẹ <small>480p</small></a>
       </div>
     </div>
-    <a class="ghost-btn" href="/">Tạo video mới</a>
-  </div>
-</header>
+    <button class="pill" id="journal-toggle">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M12 7v5l3 2"/></svg>
+      <span id="journal-label">Ẩn nhật ký</span>
+    </button>
+    <a class="done" href="/">Xong</a>
+  </header>
 
-<section id="video-root" data-video-id="{{ v.id }}" data-ratio="{{ v.aspect_ratio }}" data-status="{{ v.status }}">
-  <div class="player-wrap" data-ratio="{{ v.aspect_ratio }}" style="position:relative">
-    <video id="player" class="player" controls playsinline preload="metadata"
-      {% if v.status == 'completed' %}src="/video/{{ v.id }}/download"{% endif %}></video>
-    <div id="stage-overlay" class="stage-overlay{% if v.status == 'completed' %} hidden{% endif %}">
-      <div class="big-spin"></div>
-      <div class="st-pct" id="st-pct">{{ v.progress or 4 }}%</div>
-      <div class="st-label" id="st-label">Đang khởi tạo AI…</div>
-      <div class="stage-bar"><i id="stage-bar-fill" style="width:{{ v.progress or 4 }}%"></i></div>
-      <div class="stage-sub">Video sẽ tự hiện ngay khi hoàn tất — bạn không cần chờ ở đây.</div>
-    </div>
-  </div>
-</section>
-
-<section class="tl-panel">
-  <div class="tl-head">
-    <h2>Dòng thời gian</h2>
-    <small>Nối thêm cảnh tiếp theo, AI sẽ tiếp diễn từ khung hình cuối.</small>
-  </div>
-  <div class="tl-strip" id="tl-strip"></div>
-
-  <div class="extend-box hidden" id="extend-box">
-    <textarea id="extend-prompt" placeholder="Mô tả cảnh tiếp theo… Ví dụ: máy quay bay vượt qua ban công, lộ ra toàn cảnh thành phố lúc hoàng hôn."></textarea>
-    <div class="extend-actions">
-      <span class="hint">Nối thêm ~7 giây, tiếp nối liền mạch từ cảnh trước.</span>
-      <div class="btns">
-        <button class="btn-ghost" type="button" id="extend-cancel">Huỷ</button>
-        <button class="btn-primary" type="button" id="extend-submit">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-          Kéo dài
+  <!-- BODY -->
+  <div class="body">
+    <div class="stage">
+      <div class="ratio-badge"><span class="box"></span><span id="ratio-txt">{{ v.aspect_ratio }}</span></div>
+      <div class="player-box" id="pbox">
+        <video id="player" playsinline preload="metadata" {% if v.status == 'completed' %}src="/video/{{ v.id }}/download"{% endif %}></video>
+        <div class="ov{% if v.status == 'completed' %} hidden{% endif %}" id="ov">
+          <div class="big-spin"></div>
+          <div class="pct" id="ov-pct">{{ v.progress or 4 }}%</div>
+          <div class="lab" id="ov-lab">Đang khởi tạo AI…</div>
+          <div class="bar"><i id="ov-bar" style="width:{{ v.progress or 4 }}%"></i></div>
+          <div class="sub">Video sẽ tự hiện khi hoàn tất.</div>
+        </div>
+      </div>
+      <div class="transport" id="transport">
+        <button class="m" id="mute" title="Âm lượng">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
         </button>
+        <span class="t" id="cur">00:00:00</span>
+        <button class="m" id="prev" title="Về đầu"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+        <button class="play" id="play" title="Phát"><svg id="play-ic" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+        <button class="m" id="next" title="Tới cuối"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg></button>
+        <span class="t" id="tot">00:00:00</span>
+        <button class="m" id="fs" title="Toàn màn hình"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5M21 8V3h-5M16 21h5v-5M3 16v5h5"/></svg></button>
       </div>
     </div>
-    <div class="extend-msg" id="extend-msg"></div>
+
+    <aside class="journal" id="journal"></aside>
   </div>
-</section>
 
-<section class="panel">
-  <h2>Mô tả</h2>
-  <p class="prose">{{ v.prompt }}</p>
-</section>
-{% endblock %}
+  <!-- TIMELINE -->
+  <div class="tl">
+    <div class="tl-head">
+      <button class="zoom-btn" id="zoom-out"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
+      <button class="zoom-btn" id="zoom-in"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <div class="tl-scroll" id="tl-scroll">
+      <div class="tl-inner" id="tl-inner">
+        <div class="ruler" id="ruler"></div>
+        <div class="film" id="film"></div>
+        <div class="playhead hidden" id="playhead" style="left:0"></div>
+      </div>
+    </div>
+  </div>
 
-{% block scripts %}
+  <!-- EDIT BAR -->
+  <div class="editbar-wrap">
+    <div class="editbar">
+      <button class="plus-in" id="add-inline" title="Kéo dài cảnh"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <input id="edit-input" placeholder="Mô tả cảnh tiếp theo để kéo dài video…" autocomplete="off">
+      <span class="model"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/></svg> Veo 3.1</span>
+      <button class="send" id="send" title="Kéo dài"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="emsg hidden" id="emsg"></div>
+  </div>
+  <div class="foot-note">RETI Studio dùng Google Veo — hãy xác minh nội dung do AI tạo.</div>
+</div>
+
 <script>
-  const root = document.getElementById("video-root");
-  const videoId = root.dataset.videoId;
-  const ratio = root.dataset.ratio;
-  const player = document.getElementById("player");
-  const overlay = document.getElementById("stage-overlay");
-  const barFill = document.getElementById("stage-bar-fill");
-  const stPct = document.getElementById("st-pct");
-  const stLabel = document.getElementById("st-label");
-  const strip = document.getElementById("tl-strip");
+const root=document.getElementById('root');
+const videoId=root.dataset.videoId;
+const ratio=root.dataset.ratio;
+const player=document.getElementById('player');
+const pbox=document.getElementById('pbox');
+pbox.classList.add(ratio==='9:16'?'r916':'r169');
 
-  let running = root.dataset.status !== "completed";
-  let failed = false;
-  let realP = Number("{{ v.progress or 4 }}");
-  let target = realP, shown = realP;
-  let lastCompleted = -1;
+const ov=document.getElementById('ov'), ovBar=document.getElementById('ov-bar'), ovPct=document.getElementById('ov-pct'), ovLab=document.getElementById('ov-lab');
+let running=root.dataset.status!=='completed', failed=false;
+let realP=Number(root.dataset.progress||4), target=realP, shown=realP, lastCompleted=-1;
+let zoom=1, frames=[], builtFor='';
 
-  function stageLabel(status, p) {
-    if (status === "pending") return "Đang vào hàng đợi…";
-    if (p < 15) return "Đang khởi tạo AI…";
-    if (p < 88) return "AI đang dựng từng khung hình…";
-    return "Đang hoàn thiện & xuất video…";
-  }
+function pad(n){return String(n).padStart(2,'0')}
+function fmt(t){t=Math.max(0,t||0);const s=Math.floor(t);return `${pad(Math.floor(s/60))}:${pad(s%60)}:${pad(Math.floor((t-s)*24))}`}
+function stageLabel(st,p){if(st==='pending')return'Đang vào hàng đợi…';if(p<15)return'Đang khởi tạo AI…';if(p<88)return'AI đang dựng từng khung hình…';return'Đang hoàn thiện & xuất video…'}
 
-  // Smooth, always-moving progress bar (feels realtime even between server polls).
-  function animate() {
-    if (failed) return;
-    if (running) {
-      const ceil = Math.min(97, realP + 8);
-      if (target < ceil) target += 0.02;
-    } else {
-      target = 100;
-    }
-    target = Math.max(target, realP);
-    shown += (target - shown) * 0.06;
-    const bf = document.getElementById("stage-bar-fill");
-    const sp = document.getElementById("st-pct");
-    if (bf) bf.style.width = shown.toFixed(1) + "%";
-    if (sp) sp.textContent = Math.round(shown) + "%";
-    requestAnimationFrame(animate);
-  }
+/* ---- smooth progress ---- */
+function animate(){
+  if(failed)return;
+  if(running){const c=Math.min(97,realP+8);if(target<c)target+=0.02}else target=100;
+  target=Math.max(target,realP);shown+=(target-shown)*0.06;
+  if(ovBar)ovBar.style.width=shown.toFixed(1)+'%';
+  if(ovPct)ovPct.textContent=Math.round(shown)+'%';
   requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
 
-  function refreshPlayer() {
-    const src = `/video/${videoId}/download?_=${Date.now()}`;
-    player.setAttribute("src", src);
-    player.load();
-    overlay.classList.remove("failed");
-    overlay.classList.add("hidden");
-    document.getElementById("dl-toggle").disabled = false;
+/* ---- custom transport ---- */
+const playIc=document.getElementById('play-ic');
+const curEl=document.getElementById('cur'), totEl=document.getElementById('tot');
+document.getElementById('play').onclick=()=>{if(player.paused)player.play();else player.pause();};
+player.addEventListener('play',()=>playIc.innerHTML='<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>');
+player.addEventListener('pause',()=>playIc.innerHTML='<path d="M8 5v14l11-7z"/>');
+document.getElementById('prev').onclick=()=>player.currentTime=0;
+document.getElementById('next').onclick=()=>{if(isFinite(player.duration))player.currentTime=player.duration;};
+document.getElementById('mute').onclick=(e)=>{player.muted=!player.muted;e.currentTarget.style.color=player.muted?'#ff6474':'';};
+document.getElementById('fs').onclick=()=>{if(pbox.requestFullscreen)pbox.requestFullscreen();};
+player.addEventListener('timeupdate',()=>{curEl.textContent=fmt(player.currentTime);movePlayhead();});
+player.addEventListener('loadedmetadata',()=>{totEl.textContent=fmt(player.duration);buildTimeline();});
+
+/* ---- timeline (filmstrip) ---- */
+const filmEl=document.getElementById('film'), rulerEl=document.getElementById('ruler'),
+      innerEl=document.getElementById('tl-inner'), playhead=document.getElementById('playhead');
+const FRAME_W=118, SECS_PER_FRAME=1.4;
+
+async function extractFrames(dur){
+  const key=player.currentSrc+'|'+dur.toFixed(2);
+  if(builtFor===key)return; builtFor=key; frames=[];
+  const n=Math.max(3,Math.round(dur/SECS_PER_FRAME));
+  const src=document.createElement('video');
+  src.src=player.currentSrc; src.muted=true; src.preload='auto';
+  await new Promise(r=>{src.onloadeddata=r;src.onerror=r;});
+  const cv=document.createElement('canvas'); const vw=src.videoWidth||640, vh=src.videoHeight||360;
+  cv.width=vw; cv.height=vh; const ctx=cv.getContext('2d');
+  for(let i=0;i<n;i++){
+    const t=Math.min(dur-0.05,(i+0.5)*dur/n);
+    await new Promise(res=>{const on=()=>{src.removeEventListener('seeked',on);res()};src.addEventListener('seeked',on);try{src.currentTime=t}catch(e){res()}});
+    try{ctx.drawImage(src,0,0,vw,vh);frames.push({t,url:cv.toDataURL('image/jpeg',0.7)});}catch(e){frames.push({t,url:''});}
   }
+  try{src.src='';}catch(e){}
+}
 
-  function showFailed(msg, canRetry) {
-    failed = true;
-    running = false;
-    overlay.classList.remove("hidden");
-    overlay.classList.add("failed");
-    const retryBtn = canRetry
-      ? `<button class="btn-primary" id="retry-btn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg> Thử lại</button>`
-      : "";
-    overlay.innerHTML =
-      `<div class="fail-icon">!</div>
-       <div class="fail-title">Tạo video thất bại</div>
-       <div class="fail-msg">${(msg || "Đã có lỗi xảy ra. Vui lòng thử lại.").replace(/</g,"&lt;")}</div>
-       <div class="fail-actions">${retryBtn}<a class="btn-ghost" href="/">Tạo video mới</a></div>`;
-    const rb = document.getElementById("retry-btn");
-    if (rb) rb.addEventListener("click", doRetry);
+function layoutTimeline(dur){
+  const containerW=document.getElementById('tl-scroll').clientWidth||1000;
+  // Strip width scales with duration & zoom, but always fills most of the bar so
+  // short clips don't leave a black gap. Frames stretch to fill exactly (matches ruler).
+  const stripW=Math.round(Math.max(frames.length*FRAME_W*zoom, (containerW-90)*(zoom>1?zoom:1)));
+  const perFrame=stripW/Math.max(frames.length,1);
+  // ruler
+  rulerEl.style.width=stripW+'px';
+  rulerEl.innerHTML='';
+  const total=Math.ceil(dur);
+  const pxPerSec=stripW/dur;
+  const step=pxPerSec<32?(pxPerSec<16?5:2):1;
+  for(let s=0;s<=total;s+=step){
+    const d=document.createElement('div');d.className='tick';d.style.left=Math.min(s*pxPerSec,stripW-2)+'px';d.textContent=pad(s);rulerEl.appendChild(d);
   }
+  // filmstrip: one active segment, frames stretched to fill the whole strip
+  filmEl.style.width=stripW+'px';
+  filmEl.innerHTML='';
+  const seg=document.createElement('div');seg.className='seg active';seg.style.width=stripW+'px';
+  frames.forEach(f=>{const im=document.createElement('img');im.src=f.url;im.style.width=perFrame+'px';im.style.flex='0 0 auto';seg.appendChild(im);});
+  const lab=document.createElement('span');lab.className='seglab';lab.textContent='Cảnh';seg.appendChild(lab);
+  filmEl.appendChild(seg);
+  // add-scene button
+  const add=document.createElement('button');add.className='add-scene';
+  add.innerHTML='<span class="plus"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Kéo dài';
+  add.onclick=focusEdit;
+  filmEl.appendChild(add);
+  innerEl.style.width=(stripW+90)+'px';
+  // seek by click on strip
+  seg.onclick=(e)=>{const rect=seg.getBoundingClientRect();const x=e.clientX-rect.left;player.currentTime=Math.max(0,Math.min(dur,(x/stripW)*dur));};
+  movePlayhead();
+}
+function movePlayhead(){
+  const dur=player.duration; if(!dur||!isFinite(dur)){playhead.classList.add('hidden');return;}
+  const stripW=filmEl.offsetWidth||0; if(!stripW)return;
+  playhead.classList.remove('hidden');
+  playhead.style.left=((player.currentTime/dur)*stripW)+'px';
+}
+async function buildTimeline(){
+  const dur=player.duration; if(!dur||!isFinite(dur))return;
+  await extractFrames(dur);
+  layoutTimeline(dur);
+}
+document.getElementById('zoom-in').onclick=()=>{zoom=Math.min(3,zoom*1.3);if(player.duration)layoutTimeline(player.duration);};
+document.getElementById('zoom-out').onclick=()=>{zoom=Math.max(0.5,zoom/1.3);if(player.duration)layoutTimeline(player.duration);};
 
-  async function doRetry() {
-    const rb = document.getElementById("retry-btn");
-    if (rb) { rb.disabled = true; rb.textContent = "Đang gửi lại…"; }
-    try {
-      const r = await fetch(`/video/${videoId}/retry`, { method: "POST" });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok) {
-        failed = false; running = true;
-        realP = 4; target = 4; shown = 4;
-        overlay.classList.remove("failed");
-        overlay.innerHTML =
-          `<div class="big-spin"></div><div class="st-pct" id="st-pct">4%</div>
-           <div class="st-label" id="st-label">Đang khởi tạo AI…</div>
-           <div class="stage-bar"><i id="stage-bar-fill" style="width:4%"></i></div>
-           <div class="stage-sub">Video sẽ tự hiện ngay khi hoàn tất — bạn không cần chờ ở đây.</div>`;
-        requestAnimationFrame(animate);
-        poll();
-      } else if (rb) {
-        rb.disabled = false; rb.textContent = "Thử lại";
-        showFailed(d.detail || "Không gửi lại được.", true);
-      }
-    } catch (e) {
-      if (rb) { rb.disabled = false; rb.textContent = "Thử lại"; }
-    }
-  }
-
-  function clipCard(c) {
-    const el = document.createElement("div");
-    el.className = "tl-clip" + (c.status === "failed" ? " failed" : "");
-    el.dataset.ratio = ratio;
-    const posLabel = c.position <= 1 ? "Cảnh gốc" : "Cảnh " + c.position;
-    let thumb = "";
-    if (c.status === "completed" && c.download_url) {
-      thumb = `<video muted playsinline preload="metadata" src="/clip/${c.job_id}/download#t=1"></video>`;
-    } else if (c.status === "failed") {
-      thumb = `<div class="st">⚠️<span>Tạo cảnh lỗi</span></div>`;
-    } else {
-      const lbl = c.status === "running" ? `Đang tạo… ${c.progress || 0}%` : "Trong hàng đợi…";
-      thumb = `<div class="st"><span class="mini-spin"></span><span>${lbl}</span></div>`;
-    }
-    el.innerHTML = `<div class="thumb"><span class="pos">${posLabel}</span>${thumb}</div>
-      <div class="cap">${(c.prompt || "").replace(/</g,"&lt;").slice(0,90) || "Cảnh video"}</div>`;
-    if (c.status === "completed" && c.download_url) {
-      const vid = el.querySelector("video");
-      el.addEventListener("mouseenter", () => { try { vid.currentTime = 0; vid.play(); } catch(e){} });
-      el.addEventListener("mouseleave", () => { try { vid.pause(); vid.currentTime = 1; } catch(e){} });
-    }
-    return el;
-  }
-
-  function addCard() {
-    const el = document.createElement("div");
-    el.className = "tl-add";
-    el.innerHTML = `<span class="plus"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Kéo dài</span>`;
-    el.addEventListener("click", openExtend);
-    return el;
-  }
-
-  function renderClips(clips) {
-    strip.innerHTML = "";
-    (clips || []).forEach((c) => strip.appendChild(clipCard(c)));
-    const anyBusy = (clips || []).some((c) => c.status === "pending" || c.status === "running");
-    const hasCompleted = (clips || []).some((c) => c.status === "completed");
-    if (!anyBusy && hasCompleted) strip.appendChild(addCard());
-  }
-
-  // Extend composer
-  const extendBox = document.getElementById("extend-box");
-  const extendPrompt = document.getElementById("extend-prompt");
-  const extendMsg = document.getElementById("extend-msg");
-  const extendSubmit = document.getElementById("extend-submit");
-  function openExtend() { extendBox.classList.remove("hidden"); extendPrompt.focus(); extendBox.scrollIntoView({behavior:"smooth",block:"nearest"}); }
-  document.getElementById("extend-cancel").addEventListener("click", () => { extendBox.classList.add("hidden"); extendMsg.textContent=""; });
-  extendSubmit.addEventListener("click", async () => {
-    const prompt = extendPrompt.value.trim();
-    extendMsg.textContent = "";
-    extendSubmit.disabled = true;
-    try {
-      const fd = new FormData();
-      fd.append("prompt", prompt);
-      const r = await fetch(`/video/${videoId}/extend`, { method: "POST", body: fd });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok) {
-        extendPrompt.value = "";
-        extendBox.classList.add("hidden");
-        running = true;
-        overlay.classList.remove("hidden");
-        realP = 4; target = 4; shown = 4;
-        poll();
-      } else {
-        extendMsg.textContent = d.detail || "Không kéo dài được, thử lại sau.";
-      }
-    } catch (e) {
-      extendMsg.textContent = "Lỗi kết nối, thử lại.";
-    } finally {
-      extendSubmit.disabled = false;
-    }
+/* ---- journal (right panel) ---- */
+const journal=document.getElementById('journal');
+function renderJournal(clips){
+  journal.innerHTML='';
+  (clips||[]).forEach(c=>{
+    const card=document.createElement('div');card.className='jcard';
+    const done=c.status==='completed'&&c.download_url;
+    const badge=c.position<=1?'Cảnh gốc':'Cảnh '+c.position;
+    let inner;
+    if(done)inner=`<video muted playsinline preload="metadata" src="/clip/${c.job_id}/download#t=1"></video>`;
+    else if(c.status==='failed')inner=`<div class="st">⚠️ Lỗi</div>`;
+    else inner=`<div class="st"><span class="mini-spin"></span>${c.status==='running'?(c.progress||0)+'%':'Chờ…'}</div>`;
+    card.innerHTML=`<div class="thumb"><span class="badge">${badge}</span>${inner}</div>
+      <div class="ptext"><p>${(c.prompt||'').replace(/</g,'&lt;')}</p>
+      <span class="chev"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></div>`;
+    const pt=card.querySelector('.ptext');pt.querySelector('.chev').onclick=()=>pt.classList.toggle('open');
+    if(done){const vd=card.querySelector('video');card.onmouseenter=()=>{try{vd.currentTime=0;vd.play()}catch(e){}};card.onmouseleave=()=>{try{vd.pause();vd.currentTime=1}catch(e){}};}
+    journal.appendChild(card);
   });
+}
+document.getElementById('journal-toggle').onclick=()=>{
+  journal.classList.toggle('hidden');
+  document.getElementById('journal-label').textContent=journal.classList.contains('hidden')?'Hiện nhật ký':'Ẩn nhật ký';
+};
 
-  async function poll() {
-    try {
-      const [sv, cl] = await Promise.all([
-        fetch(`/api/video/${videoId}`, { cache: "no-store" }).then((r) => r.json()),
-        fetch(`/api/video/${videoId}/clips`, { cache: "no-store" }).then((r) => r.json()),
-      ]);
-      const clips = (cl && cl.clips) || [];
-      renderClips(clips);
-      const completedCount = clips.filter((c) => c.status === "completed").length;
+/* ---- fail / retry ---- */
+function showFailed(msg,canRetry){
+  failed=true;running=false;ov.classList.remove('hidden');ov.classList.add('fail');
+  const rb=canRetry?`<button class="btn-p" id="retry-btn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg> Thử lại</button>`:'';
+  ov.innerHTML=`<div class="fi">!</div><div class="lab">Tạo video thất bại</div>
+    <div class="sub" style="max-width:420px">${(msg||'Đã có lỗi. Vui lòng thử lại.').replace(/</g,'&lt;')}</div>
+    <div class="facts">${rb}<a class="btn-g" href="/">Tạo video mới</a></div>`;
+  const b=document.getElementById('retry-btn');if(b)b.onclick=doRetry;
+}
+async function doRetry(){
+  const b=document.getElementById('retry-btn');if(b){b.disabled=true;b.textContent='Đang gửi lại…';}
+  try{const r=await fetch(`/video/${videoId}/retry`,{method:'POST'});const d=await r.json().catch(()=>({}));
+    if(r.ok){failed=false;running=true;realP=4;target=4;shown=4;ov.classList.remove('fail');
+      ov.innerHTML=`<div class="big-spin"></div><div class="pct" id="ov-pct">4%</div><div class="lab" id="ov-lab">Đang khởi tạo AI…</div><div class="bar"><i id="ov-bar" style="width:4%"></i></div><div class="sub">Video sẽ tự hiện khi hoàn tất.</div>`;
+      requestAnimationFrame(animate);poll();}
+    else if(b){b.disabled=false;showFailed(d.detail||'Không gửi lại được.',true);}
+  }catch(e){if(b){b.disabled=false;b.textContent='Thử lại';}}
+}
 
-      if (sv.status === "completed") {
-        failed = false;
-        realP = 100;
-        if (running || completedCount !== lastCompleted) refreshPlayer();
-        running = false;
-      } else if (sv.status === "failed") {
-        if (!failed) showFailed(sv.error, sv.can_retry !== false);
-      } else {
-        failed = false;
-        running = true;
-        realP = Math.max(4, Math.min(97, Number(sv.progress || 0)));
-        const sl = document.getElementById("st-label");
-        if (sl) sl.textContent = stageLabel(sv.status, realP);
-        overlay.classList.remove("hidden");
-      }
-      lastCompleted = completedCount;
-    } catch (e) {}
-  }
-  poll();
-  setInterval(poll, 2500);
+/* ---- extend (edit bar) ---- */
+const input=document.getElementById('edit-input'), sendBtn=document.getElementById('send'), emsg=document.getElementById('emsg');
+function focusEdit(){input.focus();input.scrollIntoView({block:'nearest'});}
+document.getElementById('add-inline').onclick=focusEdit;
+input.addEventListener('keydown',e=>{if(e.key==='Enter')doExtend();});
+sendBtn.onclick=doExtend;
+async function doExtend(){
+  const prompt=input.value.trim();emsg.classList.add('hidden');sendBtn.disabled=true;
+  try{const fd=new FormData();fd.append('prompt',prompt);
+    const r=await fetch(`/video/${videoId}/extend`,{method:'POST',body:fd});const d=await r.json().catch(()=>({}));
+    if(r.ok){input.value='';running=true;failed=false;ov.classList.remove('hidden','fail');realP=4;target=4;shown=4;
+      ov.innerHTML=`<div class="big-spin"></div><div class="pct" id="ov-pct">4%</div><div class="lab" id="ov-lab">Đang khởi tạo AI…</div><div class="bar"><i id="ov-bar" style="width:4%"></i></div><div class="sub">Video sẽ tự hiện khi hoàn tất.</div>`;
+      requestAnimationFrame(animate);poll();}
+    else{emsg.textContent=d.detail||'Không kéo dài được.';emsg.classList.remove('hidden');}
+  }catch(e){emsg.textContent='Lỗi kết nối.';emsg.classList.remove('hidden');}
+  finally{sendBtn.disabled=false;}
+}
 
-  // Download menu
-  const dlToggle = document.getElementById("dl-toggle");
-  const dlList = document.getElementById("dl-list");
-  dlToggle.addEventListener("click", (e) => { e.stopPropagation(); dlList.classList.toggle("hidden"); });
-  document.addEventListener("click", () => dlList.classList.add("hidden"));
+/* ---- download menu ---- */
+const dlList=document.getElementById('dl-list');
+document.getElementById('dl-toggle').onclick=e=>{e.stopPropagation();dlList.classList.toggle('hidden');};
+document.addEventListener('click',()=>dlList.classList.add('hidden'));
+
+/* ---- refresh player after new clip ---- */
+function refreshPlayer(){const t=player.currentTime||0;player.src=`/video/${videoId}/download?_=${Date.now()}`;player.load();ov.classList.add('hidden');ov.classList.remove('fail');builtFor='';}
+
+/* ---- poll ---- */
+async function poll(){
+  try{
+    const [sv,cl]=await Promise.all([
+      fetch(`/api/video/${videoId}`,{cache:'no-store'}).then(r=>r.json()),
+      fetch(`/api/video/${videoId}/clips`,{cache:'no-store'}).then(r=>r.json()),
+    ]);
+    const clips=(cl&&cl.clips)||[];renderJournal(clips);
+    const done=clips.filter(c=>c.status==='completed').length;
+    if(sv.status==='completed'){failed=false;realP=100;if(running||done!==lastCompleted)refreshPlayer();running=false;}
+    else if(sv.status==='failed'){if(!failed)showFailed(sv.error,sv.can_retry!==false);}
+    else{failed=false;running=true;realP=Math.max(4,Math.min(97,Number(sv.progress||0)));
+      const l=document.getElementById('ov-lab');if(l)l.textContent=stageLabel(sv.status,realP);ov.classList.remove('hidden');}
+    lastCompleted=done;
+  }catch(e){}
+}
+poll();setInterval(poll,2500);
+window.addEventListener('resize',()=>{if(player.duration)layoutTimeline(player.duration);});
 </script>
-{% endblock %}
+</body>
+</html>
