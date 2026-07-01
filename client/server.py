@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.2.1"
+CLIENT_VERSION = "1.2.2"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 
@@ -182,8 +182,10 @@ def logout():
 async def create(
     prompt: str = Form(...),
     aspect_ratio: str = Form("16:9"),
-    duration_seconds: int = Form(30),
+    duration_seconds: int = Form(8),
     video_style: str = Form("cinematic"),
+    voice: str = Form("off"),
+    music: str = Form("off"),
     images: list[UploadFile] = File(default=[]),
     logo: UploadFile | None = File(default=None),
 ):
@@ -192,6 +194,8 @@ async def create(
         "aspect_ratio": aspect_ratio,
         "duration_seconds": str(duration_seconds),
         "video_style": video_style,
+        "voice": voice,
+        "music": music,
     }
     files = [("images", (f.filename, await f.read(), f.content_type or "image/jpeg")) for f in images if f and f.filename]
     if logo is not None and logo.filename:

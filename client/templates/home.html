@@ -32,11 +32,13 @@
             <select name="aspect_ratio"><option value="16:9" selected>16:9 ngang</option><option value="9:16">9:16 dọc</option></select>
           </label>
           <label class="chip">
-            <select name="duration_seconds"><option value="15">15 giây</option><option value="30" selected>30 giây</option><option value="45">45 giây</option><option value="60">60 giây</option></select>
+            <select name="duration_seconds"><option value="4">4 giây</option><option value="6">6 giây</option><option value="8" selected>8 giây</option></select>
           </label>
           <label class="chip">
             <select name="video_style"><option value="cinematic" selected>Điện ảnh</option><option value="luxury">Sang trọng</option><option value="modern">Hiện đại</option><option value="warm">Ấm áp</option><option value="minimal">Tối giản</option><option value="social">Mạng xã hội</option></select>
           </label>
+          <label class="chip toggle-chip"><input type="checkbox" name="voice" value="on" checked><span>Thuyết minh</span></label>
+          <label class="chip toggle-chip"><input type="checkbox" name="music" value="on" checked><span>Nhạc</span></label>
         </div>
         <div class="prompt-send">
           <button class="generate-btn" type="submit">Tạo video
@@ -74,6 +76,8 @@
           <label class="chip">
             <select name="video_style"><option value="modern" selected>Hiện đại</option><option value="luxury">Sang trọng</option><option value="cinematic">Điện ảnh</option><option value="warm">Ấm áp</option><option value="minimal">Tối giản</option><option value="social">Mạng xã hội</option></select>
           </label>
+          <label class="chip toggle-chip"><input type="checkbox" name="voice" value="on" checked><span>Thuyết minh</span></label>
+          <label class="chip toggle-chip"><input type="checkbox" name="music" value="on" checked><span>Nhạc</span></label>
         </div>
         <div class="prompt-send">
           <button class="generate-btn" type="submit">Tạo video
