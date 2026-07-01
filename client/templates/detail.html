@@ -1,41 +1,129 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+  .tl-panel{margin-top:22px;background:linear-gradient(180deg,rgba(20,22,30,.72),rgba(14,15,20,.72));
+    border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:20px 20px 22px}
+  .tl-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px}
+  .tl-head h2{margin:0;font-size:16px;font-weight:700}
+  .tl-head small{color:#8b90a0}
+  .tl-strip{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 12px;scrollbar-width:thin}
+  .tl-strip::-webkit-scrollbar{height:8px}
+  .tl-strip::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:8px}
+  .tl-clip{flex:0 0 auto;width:200px;border-radius:14px;overflow:hidden;background:#0c0d12;
+    border:1px solid rgba(255,255,255,.08);position:relative;transition:border-color .2s}
+  .tl-clip:hover{border-color:rgba(255,70,87,.5)}
+  .tl-clip .thumb{position:relative;width:100%;aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center}
+  .tl-clip[data-ratio="9:16"] .thumb{aspect-ratio:9/16;max-height:220px;margin:0 auto}
+  .tl-clip video{width:100%;height:100%;object-fit:cover;display:block}
+  .tl-clip .pos{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.62);color:#fff;font-size:11px;
+    font-weight:700;padding:3px 8px;border-radius:20px;z-index:2}
+  .tl-clip .st{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:8px;color:#c9cdd8;font-size:12.5px;text-align:center;padding:10px}
+  .tl-clip .st .mini-spin{width:22px;height:22px;border:2.5px solid rgba(255,255,255,.18);
+    border-top-color:#ff4657;border-radius:50%;animation:spin .8s linear infinite}
+  .tl-clip .cap{padding:10px 12px;font-size:12px;color:#9aa0b0;line-height:1.4;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:44px}
+  .tl-clip.failed{border-color:rgba(255,90,90,.5)}
+  .tl-clip.failed .st{color:#ff8a8a}
+  .tl-add{flex:0 0 auto;width:150px;border-radius:14px;border:1.6px dashed rgba(255,255,255,.18);
+    background:rgba(255,255,255,.02);color:#c9cdd8;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;cursor:pointer;font-weight:600;font-size:13px;transition:.2s;min-height:150px}
+  .tl-add:hover{border-color:#ff4657;color:#fff;background:rgba(255,70,87,.06)}
+  .tl-add .plus{width:42px;height:42px;border-radius:50%;background:rgba(255,70,87,.14);color:#ff6474;
+    display:flex;align-items:center;justify-content:center}
+  .extend-box{margin-top:16px;background:#0c0d12;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px}
+  .extend-box textarea{width:100%;background:transparent;border:0;color:#eef0f5;font-size:14px;resize:vertical;
+    min-height:56px;outline:none;font-family:inherit;line-height:1.5}
+  .extend-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px}
+  .extend-actions .hint{color:#7d8291;font-size:12px}
+  .extend-actions .btns{display:flex;gap:8px}
+  .extend-msg{color:#ff8a8a;font-size:12.5px;margin-top:8px;min-height:0}
+  .btn-primary{background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff;border:0;border-radius:10px;
+    padding:9px 16px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn-primary:disabled{opacity:.55;cursor:not-allowed}
+  .btn-ghost{background:rgba(255,255,255,.06);color:#c9cdd8;border:0;border-radius:10px;padding:9px 14px;
+    font-weight:600;font-size:13px;cursor:pointer}
+  .stage-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;background:radial-gradient(circle at 50% 40%,rgba(30,32,42,.6),rgba(8,9,12,.92));color:#eef0f5;text-align:center;padding:24px}
+  .stage-overlay .big-spin{width:46px;height:46px;border:3px solid rgba(255,255,255,.16);border-top-color:#ff4657;
+    border-radius:50%;animation:spin .9s linear infinite}
+  .stage-overlay .st-label{font-weight:600;font-size:15px}
+  .stage-overlay .st-pct{font-size:34px;font-weight:800;letter-spacing:-1px;
+    background:linear-gradient(135deg,#ff5a68,#ff9a4d);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stage-bar{width:min(360px,70%);height:7px;background:rgba(255,255,255,.1);border-radius:20px;overflow:hidden}
+  .stage-bar>i{display:block;height:100%;width:4%;border-radius:20px;
+    background:linear-gradient(90deg,#ff4657,#ff9a4d);transition:width .25s ease-out}
+  .stage-sub{color:#9aa0b0;font-size:12.5px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .dl-menu{position:relative}
+  .dl-list{position:absolute;right:0;top:calc(100% + 6px);background:#15161d;border:1px solid rgba(255,255,255,.1);
+    border-radius:12px;padding:6px;min-width:190px;z-index:20;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+  .dl-list a{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:8px;color:#dfe2ea;
+    font-size:13px;text-decoration:none}
+  .dl-list a:hover{background:rgba(255,255,255,.07)}
+  .dl-list a small{color:#7d8291}
+  .hidden{display:none !important}
+</style>
+
 <header class="topbar">
   <div>
-    <p class="eyebrow"><a href="/" class="crumb">Video của tôi</a> / Video</p>
+    <p class="eyebrow"><a href="/" class="crumb">Video của tôi</a> / Dòng thời gian</p>
     <h1 class="topbar-title">{{ v.prompt[:70] }}</h1>
-    <p class="topbar-sub">{{ v.aspect_ratio }} · {{ v.duration_seconds }}s</p>
+    <p class="topbar-sub">{{ v.aspect_ratio }} · {{ v.duration_seconds }}s · {% if v.quality == 'high' %}Full HD 1080p{% else %}HD 720p{% endif %}</p>
   </div>
   <div class="render-actions">
-    {% if v.status == 'completed' %}
-    <a class="ghost-btn" href="/video/{{ v.id }}/download" download="reti-video-{{ v.id }}.mp4">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
-      Tải về
-    </a>
-    {% endif %}
+    <div class="dl-menu">
+      <button class="ghost-btn" id="dl-toggle" type="button" {% if v.status != 'completed' %}disabled{% endif %}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
+        Tải về
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="dl-list hidden" id="dl-list">
+        <a href="/video/{{ v.id }}/download?quality=original" download="reti-video-{{ v.id }}.mp4">Bản gốc <small>chất lượng cao nhất</small></a>
+        <a href="/video/{{ v.id }}/download?quality=1080" download="reti-video-{{ v.id }}-1080p.mp4">Full HD <small>1080p</small></a>
+        <a href="/video/{{ v.id }}/download?quality=720" download="reti-video-{{ v.id }}-720p.mp4">HD <small>720p</small></a>
+        <a href="/video/{{ v.id }}/download?quality=480" download="reti-video-{{ v.id }}-480p.mp4">Nhẹ <small>480p</small></a>
+      </div>
+    </div>
     <a class="ghost-btn" href="/">Tạo video mới</a>
   </div>
 </header>
 
-<div id="proc-banner" class="proc-banner{% if v.status == 'completed' %} hidden{% endif %}">
-  <span class="spinner" aria-hidden="true"></span>
-  <div class="proc-copy">
-    <strong id="proc-label">Đang tạo video…</strong>
-    <div class="progress"><div id="proc-bar" style="width: {{ v.progress or 4 }}%"></div></div>
-  </div>
-  <small>Video sẽ tự hiện khi hoàn tất.</small>
-</div>
-
 <section id="video-root" data-video-id="{{ v.id }}" data-ratio="{{ v.aspect_ratio }}" data-status="{{ v.status }}">
-  {% if v.status == 'completed' %}
-    <div class="player-wrap" data-ratio="{{ v.aspect_ratio }}">
-      <video class="player" controls playsinline preload="metadata" src="/video/{{ v.id }}/download"></video>
+  <div class="player-wrap" data-ratio="{{ v.aspect_ratio }}" style="position:relative">
+    <video id="player" class="player" controls playsinline preload="metadata"
+      {% if v.status == 'completed' %}src="/video/{{ v.id }}/download"{% endif %}></video>
+    <div id="stage-overlay" class="stage-overlay{% if v.status == 'completed' %} hidden{% endif %}">
+      <div class="big-spin"></div>
+      <div class="st-pct" id="st-pct">{{ v.progress or 4 }}%</div>
+      <div class="st-label" id="st-label">Đang khởi tạo AI…</div>
+      <div class="stage-bar"><i id="stage-bar-fill" style="width:{{ v.progress or 4 }}%"></i></div>
+      <div class="stage-sub">Video sẽ tự hiện ngay khi hoàn tất — bạn không cần chờ ở đây.</div>
     </div>
-  {% else %}
-    <div class="player-wrap placeholder" data-ratio="{{ v.aspect_ratio }}">
-      <span>Đang tạo video của bạn…</span>
+  </div>
+</section>
+
+<section class="tl-panel">
+  <div class="tl-head">
+    <h2>Dòng thời gian</h2>
+    <small>Nối thêm cảnh tiếp theo, AI sẽ tiếp diễn từ khung hình cuối.</small>
+  </div>
+  <div class="tl-strip" id="tl-strip"></div>
+
+  <div class="extend-box hidden" id="extend-box">
+    <textarea id="extend-prompt" placeholder="Mô tả cảnh tiếp theo… Ví dụ: máy quay bay vượt qua ban công, lộ ra toàn cảnh thành phố lúc hoàng hôn."></textarea>
+    <div class="extend-actions">
+      <span class="hint">Nối thêm ~7 giây, tiếp nối liền mạch từ cảnh trước.</span>
+      <div class="btns">
+        <button class="btn-ghost" type="button" id="extend-cancel">Huỷ</button>
+        <button class="btn-primary" type="button" id="extend-submit">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Kéo dài
+        </button>
+      </div>
     </div>
-  {% endif %}
+    <div class="extend-msg" id="extend-msg"></div>
+  </div>
 </section>
 
 <section class="panel">
@@ -48,21 +136,154 @@
 <script>
   const root = document.getElementById("video-root");
   const videoId = root.dataset.videoId;
-  const done = root.dataset.status === "completed";
-  const bar = document.getElementById("proc-bar");
-  const label = document.getElementById("proc-label");
-  async function poll() {
-    if (done) return;
+  const ratio = root.dataset.ratio;
+  const player = document.getElementById("player");
+  const overlay = document.getElementById("stage-overlay");
+  const barFill = document.getElementById("stage-bar-fill");
+  const stPct = document.getElementById("st-pct");
+  const stLabel = document.getElementById("st-label");
+  const strip = document.getElementById("tl-strip");
+
+  let running = root.dataset.status !== "completed";
+  let realP = Number("{{ v.progress or 4 }}");
+  let target = realP, shown = realP;
+  let lastCompleted = -1;
+
+  function stageLabel(status, p) {
+    if (status === "pending") return "Đang vào hàng đợi…";
+    if (p < 15) return "Đang khởi tạo AI…";
+    if (p < 88) return "AI đang dựng từng khung hình…";
+    return "Đang hoàn thiện & xuất video…";
+  }
+
+  // Smooth, always-moving progress bar (feels realtime even between server polls).
+  function animate() {
+    if (running) {
+      const ceil = Math.min(97, realP + 8);
+      if (target < ceil) target += 0.02;
+    } else {
+      target = 100;
+    }
+    target = Math.max(target, realP);
+    shown += (target - shown) * 0.06;
+    if (barFill) barFill.style.width = shown.toFixed(1) + "%";
+    if (stPct) stPct.textContent = Math.round(shown) + "%";
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+
+  function refreshPlayer() {
+    const src = `/video/${videoId}/download?_=${Date.now()}`;
+    const t = player.currentTime || 0;
+    player.setAttribute("src", src);
+    player.load();
+    overlay.classList.add("hidden");
+    document.getElementById("dl-toggle").disabled = false;
+  }
+
+  function clipCard(c) {
+    const el = document.createElement("div");
+    el.className = "tl-clip" + (c.status === "failed" ? " failed" : "");
+    el.dataset.ratio = ratio;
+    const posLabel = c.position <= 1 ? "Cảnh gốc" : "Cảnh " + c.position;
+    let thumb = "";
+    if (c.status === "completed" && c.download_url) {
+      thumb = `<video muted playsinline preload="metadata" src="/clip/${c.job_id}/download#t=1"></video>`;
+    } else if (c.status === "failed") {
+      thumb = `<div class="st">⚠️<span>Tạo cảnh lỗi</span></div>`;
+    } else {
+      const lbl = c.status === "running" ? `Đang tạo… ${c.progress || 0}%` : "Trong hàng đợi…";
+      thumb = `<div class="st"><span class="mini-spin"></span><span>${lbl}</span></div>`;
+    }
+    el.innerHTML = `<div class="thumb"><span class="pos">${posLabel}</span>${thumb}</div>
+      <div class="cap">${(c.prompt || "").replace(/</g,"&lt;").slice(0,90) || "Cảnh video"}</div>`;
+    if (c.status === "completed" && c.download_url) {
+      const vid = el.querySelector("video");
+      el.addEventListener("mouseenter", () => { try { vid.currentTime = 0; vid.play(); } catch(e){} });
+      el.addEventListener("mouseleave", () => { try { vid.pause(); vid.currentTime = 1; } catch(e){} });
+    }
+    return el;
+  }
+
+  function addCard() {
+    const el = document.createElement("div");
+    el.className = "tl-add";
+    el.innerHTML = `<span class="plus"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Kéo dài</span>`;
+    el.addEventListener("click", openExtend);
+    return el;
+  }
+
+  function renderClips(clips) {
+    strip.innerHTML = "";
+    (clips || []).forEach((c) => strip.appendChild(clipCard(c)));
+    const anyBusy = (clips || []).some((c) => c.status === "pending" || c.status === "running");
+    const hasCompleted = (clips || []).some((c) => c.status === "completed");
+    if (!anyBusy && hasCompleted) strip.appendChild(addCard());
+  }
+
+  // Extend composer
+  const extendBox = document.getElementById("extend-box");
+  const extendPrompt = document.getElementById("extend-prompt");
+  const extendMsg = document.getElementById("extend-msg");
+  const extendSubmit = document.getElementById("extend-submit");
+  function openExtend() { extendBox.classList.remove("hidden"); extendPrompt.focus(); extendBox.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+  document.getElementById("extend-cancel").addEventListener("click", () => { extendBox.classList.add("hidden"); extendMsg.textContent=""; });
+  extendSubmit.addEventListener("click", async () => {
+    const prompt = extendPrompt.value.trim();
+    extendMsg.textContent = "";
+    extendSubmit.disabled = true;
     try {
-      const r = await fetch(`/api/video/${videoId}`, { cache: "no-store" });
-      if (!r.ok) return;
-      const v = await r.json();
-      if (v.status === "completed") { location.reload(); return; }
-      const p = Math.max(4, Math.min(100, Number(v.progress || 0)));
-      if (bar) bar.style.width = p + "%";
-      if (label) label.textContent = v.status === "running" ? `Đang tạo video… ${p}%` : "Đang chờ trong hàng đợi…";
+      const fd = new FormData();
+      fd.append("prompt", prompt);
+      const r = await fetch(`/video/${videoId}/extend`, { method: "POST", body: fd });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        extendPrompt.value = "";
+        extendBox.classList.add("hidden");
+        running = true;
+        overlay.classList.remove("hidden");
+        realP = 4; target = 4; shown = 4;
+        poll();
+      } else {
+        extendMsg.textContent = d.detail || "Không kéo dài được, thử lại sau.";
+      }
+    } catch (e) {
+      extendMsg.textContent = "Lỗi kết nối, thử lại.";
+    } finally {
+      extendSubmit.disabled = false;
+    }
+  });
+
+  async function poll() {
+    try {
+      const [sv, cl] = await Promise.all([
+        fetch(`/api/video/${videoId}`, { cache: "no-store" }).then((r) => r.json()),
+        fetch(`/api/video/${videoId}/clips`, { cache: "no-store" }).then((r) => r.json()),
+      ]);
+      const clips = (cl && cl.clips) || [];
+      renderClips(clips);
+      const completedCount = clips.filter((c) => c.status === "completed").length;
+
+      if (sv.status === "completed") {
+        realP = 100;
+        if (running || completedCount !== lastCompleted) refreshPlayer();
+        running = false;
+      } else {
+        running = true;
+        realP = Math.max(4, Math.min(97, Number(sv.progress || 0)));
+        if (stLabel) stLabel.textContent = stageLabel(sv.status, realP);
+        overlay.classList.remove("hidden");
+      }
+      lastCompleted = completedCount;
     } catch (e) {}
   }
-  if (!done) { poll(); setInterval(poll, 4000); }
+  poll();
+  setInterval(poll, 2500);
+
+  // Download menu
+  const dlToggle = document.getElementById("dl-toggle");
+  const dlList = document.getElementById("dl-list");
+  dlToggle.addEventListener("click", (e) => { e.stopPropagation(); dlList.classList.toggle("hidden"); });
+  document.addEventListener("click", () => dlList.classList.add("hidden"));
 </script>
 {% endblock %}

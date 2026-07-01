@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.2.3"
+CLIENT_VERSION = "1.3.0"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 
@@ -204,6 +204,7 @@ async def create(
     aspect_ratio: str = Form("16:9"),
     duration_seconds: int = Form(8),
     video_style: str = Form("cinematic"),
+    quality: str = Form("standard"),
     voice: str = Form("off"),
     music: str = Form("off"),
     images: list[UploadFile] = File(default=[]),
@@ -214,6 +215,7 @@ async def create(
         "aspect_ratio": aspect_ratio,
         "duration_seconds": str(duration_seconds),
         "video_style": video_style,
+        "quality": quality,
         "voice": voice,
         "music": music,
     }
@@ -247,10 +249,41 @@ async def video_status(video_id: int):
     return JSONResponse(resp.json(), status_code=resp.status_code)
 
 
-@app.get("/video/{video_id}/download")
-async def video_download(video_id: int):
+@app.get("/api/video/{video_id}/clips")
+async def video_clips(video_id: int):
+    """Timeline: list all clips of this video (base + extensions)."""
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(f"{CLOUD_URL}/api/v1/videos/{video_id}/clips", headers=_headers())
+    return JSONResponse(resp.json(), status_code=resp.status_code)
+
+
+@app.post("/video/{video_id}/extend")
+async def video_extend(video_id: int, prompt: str = Form("")):
+    """Timeline: add one more Veo clip continuing from the last frame."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            f"{CLOUD_URL}/api/v1/videos/{video_id}/extend",
+            data={"prompt": prompt}, headers=_headers(),
+        )
+    return JSONResponse(resp.json(), status_code=resp.status_code)
+
+
+@app.get("/clip/{job_id}/download")
+async def clip_download(job_id: int):
     async with httpx.AsyncClient(timeout=180) as client:
-        resp = await client.get(f"{CLOUD_URL}/api/v1/videos/{video_id}/download", headers=_headers())
+        resp = await client.get(f"{CLOUD_URL}/api/v1/clips/{job_id}/download", headers=_headers())
+    if resp.status_code != 200:
+        raise HTTPException(status_code=404, detail="Clip chưa sẵn sàng.")
+    return Response(content=resp.content, media_type="video/mp4")
+
+
+@app.get("/video/{video_id}/download")
+async def video_download(video_id: int, quality: str = "original"):
+    async with httpx.AsyncClient(timeout=600) as client:
+        resp = await client.get(
+            f"{CLOUD_URL}/api/v1/videos/{video_id}/download",
+            params={"quality": quality}, headers=_headers(),
+        )
     if resp.status_code != 200:
         raise HTTPException(status_code=404, detail="Video chưa sẵn sàng.")
     return Response(content=resp.content, media_type="video/mp4")

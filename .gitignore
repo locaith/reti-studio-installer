@@ -3,3 +3,7 @@ __pycache__/
 client/client.json
 dist/
 build/
+
+dist/
+*.exe
+*.dmg

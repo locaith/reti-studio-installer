@@ -50,21 +50,22 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.2.3.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.3.0.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.2.3.dmg
+          path: dist/RETI-Studio-1.3.0.dmg
 
-      - name: Publish to release v1.2.3
+      - name: Publish to release v1.3.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.3
-          name: RETI Studio 1.2.3
-          files: dist/RETI-Studio-1.2.3.dmg
+          tag_name: v1.3.0
+          name: RETI Studio 1.3.0
+          files: dist/RETI-Studio-1.3.0.dmg
           body: |
-            Bản 1.2.3 — logo/icon ứng dụng mới, upload logo, tự động cập nhật, token trả trước USD.
+            Bản 1.3.0 — Timeline kéo dài video (nối cảnh tiếp từ khung hình cuối),
+            thanh tiến trình % thời gian thực, chọn chất lượng video (720p/1080p) khi tạo và khi tải về.
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`
