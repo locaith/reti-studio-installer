@@ -37,6 +37,17 @@
   .field input{background:#15161d;border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:9px 12px;color:#eef0f5;font-size:13.5px;outline:none}
   .muted{color:#6b7077;font-size:12px}
   .soon{background:rgba(255,255,255,.06);color:#8b90a0;border-radius:8px;padding:8px 12px;font-size:12px;cursor:default}
+  .tchip{display:inline-block;margin-left:8px;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.1);color:#c9cdd8;vertical-align:middle}
+  .tchip.ok{background:rgba(45,200,120,.16);color:#7ff0b0}
+  .editor-box{background:#101218;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin:-4px 0 12px}
+  .editor-box .eh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .editor-box .eh b{font-size:13.5px}
+  .scene{background:#15161d;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:10px}
+  .scene .sn{font-size:11px;font-weight:700;color:#ff8a5c;margin-bottom:8px}
+  .scene textarea,.scene input,.editor-box .top input,.editor-box .top textarea{width:100%;background:#0e0f13;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#eef0f5;font-size:13px;outline:none;font-family:inherit;margin-bottom:7px;resize:vertical;line-height:1.5}
+  .scene label,.editor-box .top label{font-size:11px;color:#8b90a0;display:block;margin-bottom:3px}
+  .editor-box .erow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .editor-box select{background:#15161d;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#eef0f5;font-size:13px}
 </style>
 
 <header class="topbar">
@@ -109,13 +120,19 @@
     <p class="sub">Mỗi chủ đề sẽ thành một video bán hàng. Sửa/thêm/xoá theo ý.</p>
     <div id="topics">
       {% for t in p.topics %}
-      <div class="topic" data-tid="{{ t.id }}">
-        <div class="body"><strong>{{ t.title }}</strong>{% if t.angle %}<p>{{ t.angle }}</p>{% endif %}</div>
+      <div class="topic" data-tid="{{ t.id }}" data-status="{{ t.script_status }}">
+        <div class="body">
+          <strong>{{ t.title }}</strong>
+          {% if t.script_status == 'approved' %}<span class="tchip ok">Đã duyệt</span>{% elif t.script_status == 'draft' %}<span class="tchip">Có kịch bản</span>{% endif %}
+          {% if t.angle %}<p>{{ t.angle }}</p>{% endif %}
+        </div>
         <div class="acts">
-          <span class="soon" title="Sẽ có ở bước sau">Tạo kịch bản →</span>
+          <button class="btn btn-g open-script">{% if t.script_status == 'none' %}Soạn kịch bản{% else %}Xem kịch bản{% endif %}</button>
           <button class="del" title="Xoá">×</button>
         </div>
       </div>
+      <div class="editor-box" data-for="{{ t.id }}" hidden></div>
+      <script type="application/json" id="script-{{ t.id }}">{{ (t.script or {}) | tojson }}</script>
       {% endfor %}
     </div>
     <div class="row" style="margin-top:12px;align-items:flex-end">
@@ -174,7 +191,79 @@
   document.querySelectorAll(".topic .del").forEach(b=>b.onclick=async()=>{
     const tid=b.closest(".topic").dataset.tid;
     const {ok}=await post(`/projects/${pid}/topics/${tid}/delete`, null, false);
-    if(ok){b.closest(".topic").remove();showToast("Đã xoá.");}else showToast("Lỗi xoá.");
+    if(ok){b.closest(".topic").remove();const e=document.querySelector(`.editor-box[data-for="${tid}"]`);if(e)e.remove();showToast("Đã xoá.");}else showToast("Lỗi xoá.");
   });
+
+  // ---- Script editor (kịch bản) ----
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  function readScript(tid){try{return JSON.parse(document.getElementById('script-'+tid).textContent||'{}')}catch(e){return {}}}
+
+  async function openScript(tid){
+    const box=document.querySelector(`.editor-box[data-for="${tid}"]`);
+    if(!box.hidden){box.hidden=true;return;}
+    let s=readScript(tid);
+    if(!s||!s.scenes){
+      box.hidden=false;box.innerHTML='<div class="muted"><span class="mini-spin" style="display:inline-block;vertical-align:middle"></span> Đang tạo kịch bản bán hàng…</div>';
+      const {ok,data}=await post(`/projects/${pid}/topics/${tid}/script`, {duration_seconds:24}, false);
+      if(!ok){box.innerHTML='<div class="muted">Lỗi tạo kịch bản: '+((data&&data.detail)||'')+'</div>';return;}
+      s=data.script;document.getElementById('script-'+tid).textContent=JSON.stringify(s);
+    }
+    renderEditor(box,tid,s);box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
+  function renderEditor(box,tid,s){
+    const scenes=(s.scenes||[]).map((sc,i)=>`
+      <div class="scene">
+        <div class="sn">CẢNH ${sc.scene||i+1}</div>
+        <label>Hình ảnh / cảnh quay</label><textarea data-f="visual" rows="2">${esc(sc.visual)}</textarea>
+        <label>Chữ trên màn hình</label><input data-f="caption" value="${esc(sc.caption)}">
+        <label>Lời thuyết minh</label><textarea data-f="voiceover" rows="2">${esc(sc.voiceover)}</textarea>
+      </div>`).join('');
+    box.dataset.duration=s.duration_seconds||24;
+    box.innerHTML=`
+      <div class="eh"><b>Kịch bản: ${esc(s.title||'')}</b><button class="del close-ed">×</button></div>
+      <div class="top"><label>Câu mở đầu (hook)</label><input data-h="hook" value="${esc(s.hook)}"></div>
+      <div class="scenes">${scenes}</div>
+      <div class="top"><label>Kêu gọi hành động (CTA)</label><input data-h="cta" value="${esc(s.cta)}"></div>
+      <div class="erow">
+        <select data-h="aspect"><option value="16:9">16:9 ngang</option><option value="9:16">9:16 dọc</option></select>
+        <select data-h="quality"><option value="standard">HD 720p</option><option value="high">Full HD 1080p</option></select>
+        <button class="btn btn-g" data-act="save">Lưu nháp</button>
+        <button class="btn btn-p" data-act="produce">Duyệt & Dựng video →</button>
+        <span class="muted ed-msg"></span>
+      </div>`;
+    box.querySelector('.close-ed').onclick=()=>box.hidden=true;
+    box.querySelector('[data-act="save"]').onclick=()=>saveScript(tid,box,false);
+    box.querySelector('[data-act="produce"]').onclick=()=>saveScript(tid,box,true);
+  }
+
+  function collectScript(box,tid){
+    const scenes=[...box.querySelectorAll('.scene')].map((el,i)=>({
+      scene:i+1,
+      visual:el.querySelector('[data-f="visual"]').value,
+      caption:el.querySelector('[data-f="caption"]').value,
+      voiceover:el.querySelector('[data-f="voiceover"]').value,
+    }));
+    return {title:readScript(tid).title||'', hook:box.querySelector('[data-h="hook"]').value,
+            cta:box.querySelector('[data-h="cta"]').value, duration_seconds:Number(box.dataset.duration)||24, scenes};
+  }
+
+  async function saveScript(tid,box,approve){
+    const msg=box.querySelector('.ed-msg');const btns=box.querySelectorAll('button[data-act]');btns.forEach(b=>b.disabled=true);
+    msg.textContent=approve?'Đang duyệt & gửi dựng…':'Đang lưu…';
+    const script=collectScript(box,tid);
+    const r=await fetch(`/projects/${pid}/topics/${tid}/script/save`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({script,approve})});
+    if(!r.ok){msg.textContent='Lỗi lưu.';btns.forEach(b=>b.disabled=false);return;}
+    document.getElementById('script-'+tid).textContent=JSON.stringify(script);
+    if(!approve){msg.textContent='Đã lưu nháp.';showToast('Đã lưu kịch bản.');btns.forEach(b=>b.disabled=false);return;}
+    const aspect=box.querySelector('[data-h="aspect"]').value,quality=box.querySelector('[data-h="quality"]').value;
+    const {ok,data}=await post(`/projects/${pid}/topics/${tid}/produce`, {aspect_ratio:aspect, quality}, false);
+    if(ok&&data.video_id){showToast('Đang dựng video…');location.href='/video/'+data.video_id;}
+    else{msg.textContent='Lỗi dựng: '+((data&&data.detail)||'thử lại');btns.forEach(b=>b.disabled=false);}
+  }
+
+  document.querySelectorAll('.open-script').forEach(b=>b.onclick=()=>openScript(b.closest('.topic').dataset.tid));
+  const _open=new URLSearchParams(location.search).get('open');
+  if(_open)openScript(_open);
 </script>
 {% endblock %}

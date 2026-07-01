@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.3.4"
+CLIENT_VERSION = "1.3.5"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 
@@ -349,6 +349,31 @@ async def project_add_topic(project_id: int, title: str = Form(...), angle: str 
 async def project_delete_topic(project_id: int, topic_id: int):
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.delete(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}", headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/topics/{topic_id}/script")
+async def project_gen_script(project_id: int, topic_id: int, duration_seconds: int = Form(24)):
+    async with httpx.AsyncClient(timeout=120) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/script",
+                              data={"duration_seconds": str(duration_seconds)}, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/topics/{topic_id}/script/save")
+async def project_save_script(project_id: int, topic_id: int, request: Request):
+    body = await request.json()
+    async with httpx.AsyncClient(timeout=40) as client:
+        r = await client.put(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/script",
+                             json=body, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/topics/{topic_id}/produce")
+async def project_produce(project_id: int, topic_id: int, aspect_ratio: str = Form("16:9"), quality: str = Form("standard")):
+    async with httpx.AsyncClient(timeout=90) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/produce",
+                              data={"aspect_ratio": aspect_ratio, "quality": quality}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
 
