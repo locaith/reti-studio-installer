@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .pcol{max-width:900px}
+  .card{background:#0e0f13;border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:20px 22px;margin-bottom:18px}
+  .card h2{margin:0 0 4px;font-size:15px}
+  .card .sub{color:#8b90a0;font-size:12.5px;margin-bottom:14px}
+  .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px;font-size:13.5px}
+  .kv .k{color:#8b90a0}
+  .steps{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .step{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#8b90a0;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:6px 14px}
+  .step.done{color:#7ff0b0;border-color:rgba(45,200,120,.35)}
+  .step .n{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .step.done .n{background:rgba(45,200,120,.3)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .ta{width:100%;background:#15161d;border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:10px 12px;color:#eef0f5;font-size:13.5px;outline:none;font-family:inherit;resize:vertical;min-height:64px;line-height:1.5}
+  .btn{display:inline-flex;align-items:center;gap:7px;border:0;border-radius:10px;padding:10px 16px;font-weight:600;font-size:13px;cursor:pointer}
+  .btn-p{background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff}
+  .btn-p:disabled{opacity:.5}
+  .btn-g{background:rgba(255,255,255,.08);color:#dfe2ea}
+  .filebtn{position:relative;overflow:hidden}
+  .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .analysis h4{margin:14px 0 6px;font-size:13px;color:#ff8a5c;text-transform:uppercase;letter-spacing:.04em}
+  .analysis .summary{font-size:14px;line-height:1.6;color:#eef0f5}
+  .analysis ul{margin:0;padding-left:18px;line-height:1.7;font-size:13.5px;color:#cfd3dc}
+  .topic{display:flex;gap:12px;align-items:flex-start;background:#15161d;border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:14px;margin-bottom:10px}
+  .topic .body{flex:1}
+  .topic .body strong{font-size:14px}
+  .topic .body p{margin:4px 0 0;color:#9aa0b0;font-size:12.5px;line-height:1.5}
+  .topic .acts{display:flex;gap:8px;flex-shrink:0}
+  .topic .del{color:#8b90a0;background:none;border:0;cursor:pointer;font-size:18px;line-height:1}
+  .topic .del:hover{color:#ff7a7a}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);opacity:0;background:#1b1c1f;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 18px;font-size:13px;z-index:100;transition:.25s;box-shadow:0 14px 34px rgba(0,0,0,.5)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field span{font-size:12px;font-weight:600;color:#c9cdd8}
+  .field input{background:#15161d;border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:9px 12px;color:#eef0f5;font-size:13.5px;outline:none}
+  .muted{color:#6b7077;font-size:12px}
+  .soon{background:rgba(255,255,255,.06);color:#8b90a0;border-radius:8px;padding:8px 12px;font-size:12px;cursor:default}
+</style>
+
+<header class="topbar">
+  <div>
+    <p class="eyebrow"><a href="/projects" class="crumb">Dự án</a> / {{ p.name }}</p>
+    <h1 class="topbar-title">{{ p.name }}</h1>
+    <p class="topbar-sub">{% if p.developer %}{{ p.developer }}{% endif %}{% if p.area %} · {{ p.area }}{% endif %}</p>
+  </div>
+  <form action="/projects/{{ p.id }}/delete" method="post" onsubmit="return confirm('Xoá dự án này?')">
+    <button class="btn btn-g" type="submit">Xoá dự án</button>
+  </form>
+</header>
+
+<div class="pcol" id="root" data-id="{{ p.id }}">
+  <div class="steps">
+    <div class="step {% if p.briefing_chars or p.usp %}done{% endif %}"><span class="n">1</span> Hồ sơ dự án</div>
+    <div class="step {% if p.image_count %}done{% endif %}"><span class="n">2</span> Hình ảnh ({{ p.image_count }})</div>
+    <div class="step {% if p.status == 'analyzed' %}done{% endif %}"><span class="n">3</span> Phân tích & cây content</div>
+  </div>
+
+  <!-- Info -->
+  <div class="card">
+    <h2>Thông tin dự án</h2>
+    <div class="kv">
+      <span class="k">Chủ đầu tư</span><span>{{ p.developer or '—' }}</span>
+      <span class="k">Khu vực</span><span>{{ p.area or '—' }}</span>
+      <span class="k">Phân khúc</span><span>{{ p.segment or '—' }}</span>
+      <span class="k">Giá / chính sách</span><span>{{ p.price_note or '—' }}</span>
+      <span class="k">Pháp lý</span><span>{{ p.legal_note or '—' }}</span>
+      <span class="k">USP</span><span>{{ p.usp or '—' }}</span>
+      <span class="k">Hồ sơ</span><span>{{ p.briefing_chars }} ký tự</span>
+    </div>
+  </div>
+
+  <!-- Intake: documents + images -->
+  <div class="card">
+    <h2>Bổ sung hồ sơ & hình ảnh</h2>
+    <p class="sub">Dán thêm nội dung, tải tài liệu (PDF/Word/Excel/TXT) hoặc thêm ảnh dự án.</p>
+    <textarea class="ta" id="doc-text" placeholder="Dán thêm thông tin dự án…"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn-g" id="add-text">Thêm nội dung</button>
+      <label class="btn btn-g filebtn">Tải tài liệu<input type="file" id="doc-file" accept=".pdf,.doc,.docx,.xlsx,.txt" multiple></label>
+      <label class="btn btn-g filebtn">Thêm ảnh<input type="file" id="img-file" accept="image/jpeg,image/png,image/webp" multiple></label>
+    </div>
+  </div>
+
+  <!-- Analyze -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><h2>Phân tích KEY dự án (bán hàng)</h2><p class="sub" style="margin:0">AI phân tích hồ sơ → điểm bán hàng + đề xuất cây content.</p></div>
+      <button class="btn btn-p" id="analyze">{% if p.status == 'analyzed' %}Phân tích lại{% else %}Phân tích ngay{% endif %}</button>
+    </div>
+    {% if p.analysis %}
+    <div class="analysis" style="margin-top:14px">
+      {% if p.analysis.summary_vi %}<p class="summary">{{ p.analysis.summary_vi }}</p>{% endif %}
+      {% if p.analysis.usp_ranked %}<h4>Điểm bán hàng (USP)</h4><ul>{% for x in p.analysis.usp_ranked %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+      {% if p.analysis.target_buyers %}<h4>Khách mục tiêu</h4><ul>{% for x in p.analysis.target_buyers %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+      {% if p.analysis.reasons_to_buy %}<h4>Lý do xuống tiền</h4><ul>{% for x in p.analysis.reasons_to_buy %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+      {% if p.analysis.key_messages %}<h4>Thông điệp cốt lõi</h4><ul>{% for x in p.analysis.key_messages %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+      {% if p.analysis.objections %}<h4>Xử lý e ngại</h4><ul>{% for x in p.analysis.objections %}<li>{% if x is mapping %}<strong style="color:#e6e8ee">{{ x.objection }}</strong>{% if x.handling %} → {{ x.handling }}{% endif %}{% else %}{{ x }}{% endif %}</li>{% endfor %}</ul>{% endif %}
+    </div>
+    {% else %}
+    <p class="muted" style="margin-top:12px">Chưa phân tích. Bấm “Phân tích ngay” để AI đọc hồ sơ và đề xuất cây content.</p>
+    {% endif %}
+  </div>
+
+  <!-- Content tree -->
+  <div class="card">
+    <h2>Cây content ({{ p.topics|length }} chủ đề)</h2>
+    <p class="sub">Mỗi chủ đề sẽ thành một video bán hàng. Sửa/thêm/xoá theo ý.</p>
+    <div id="topics">
+      {% for t in p.topics %}
+      <div class="topic" data-tid="{{ t.id }}">
+        <div class="body"><strong>{{ t.title }}</strong>{% if t.angle %}<p>{{ t.angle }}</p>{% endif %}</div>
+        <div class="acts">
+          <span class="soon" title="Sẽ có ở bước sau">Tạo kịch bản →</span>
+          <button class="del" title="Xoá">×</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="row" style="margin-top:12px;align-items:flex-end">
+      <label class="field" style="flex:1"><span>Thêm chủ đề</span><input id="t-title" placeholder="Vd: Tiềm năng đầu tư"></label>
+      <label class="field" style="flex:2"><span>Góc khai thác</span><input id="t-angle" placeholder="Vd: Nhấn mạnh ROI cho thuê & tăng giá"></label>
+      <button class="btn btn-g" id="add-topic">Thêm</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const pid = document.getElementById("root").dataset.id;
+  const toast = document.getElementById("toast");
+  let tt;
+  function showToast(msg){toast.textContent=msg;toast.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>toast.classList.remove("show"),3500);}
+  async function post(url, body, isForm){
+    const opt={method:"POST"};
+    if(isForm)opt.body=body; else if(body){opt.body=new URLSearchParams(body);}
+    const r=await fetch(url,opt);return {ok:r.ok, data:await r.json().catch(()=>({}))};
+  }
+
+  document.getElementById("add-text").onclick=async()=>{
+    const t=document.getElementById("doc-text").value.trim();
+    if(!t){showToast("Chưa có nội dung.");return;}
+    showToast("Đang lưu…");
+    const {ok,data}=await post(`/projects/${pid}/documents`, {text:t}, false);
+    showToast(ok?"Đã thêm nội dung.":"Lỗi: "+(data.detail||""));if(ok)setTimeout(()=>location.reload(),700);
+  };
+  document.getElementById("doc-file").onchange=async(e)=>{
+    const fd=new FormData();[...e.target.files].forEach(f=>fd.append("files",f));
+    showToast("Đang đọc tài liệu…");
+    const {ok,data}=await post(`/projects/${pid}/documents`, fd, true);
+    showToast(ok?"Đã thêm tài liệu.":"Lỗi: "+(data.detail||""));if(ok)setTimeout(()=>location.reload(),700);
+  };
+  document.getElementById("img-file").onchange=async(e)=>{
+    const fd=new FormData();[...e.target.files].forEach(f=>fd.append("images",f));
+    showToast("Đang tải ảnh…");
+    const {ok,data}=await post(`/projects/${pid}/images`, fd, true);
+    showToast(ok?`Đã thêm ${data.added} ảnh.`:"Lỗi: "+(data.detail||""));if(ok)setTimeout(()=>location.reload(),700);
+  };
+  document.getElementById("analyze").onclick=async(e)=>{
+    e.target.disabled=true;const old=e.target.textContent;e.target.textContent="Đang phân tích…";
+    const {ok,data}=await post(`/projects/${pid}/analyze`, null, false);
+    if(ok){showToast("Phân tích xong.");setTimeout(()=>location.reload(),600);}
+    else{showToast("Lỗi: "+(data.detail||"thử lại"));e.target.disabled=false;e.target.textContent=old;}
+  };
+  document.getElementById("add-topic").onclick=async()=>{
+    const title=document.getElementById("t-title").value.trim();
+    if(!title){showToast("Nhập tên chủ đề.");return;}
+    const {ok,data}=await post(`/projects/${pid}/topics`, {title, angle:document.getElementById("t-angle").value}, false);
+    if(ok){showToast("Đã thêm chủ đề.");setTimeout(()=>location.reload(),500);}else showToast("Lỗi: "+(data.detail||""));
+  };
+  document.querySelectorAll(".topic .del").forEach(b=>b.onclick=async()=>{
+    const tid=b.closest(".topic").dataset.tid;
+    const {ok}=await post(`/projects/${pid}/topics/${tid}/delete`, null, false);
+    if(ok){b.closest(".topic").remove();showToast("Đã xoá.");}else showToast("Lỗi xoá.");
+  });
+</script>
+{% endblock %}

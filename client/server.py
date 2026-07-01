@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.3.3"
+CLIENT_VERSION = "1.3.4"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 
@@ -278,6 +278,85 @@ def open_folder():
         return {"ok": True, "folder": str(folder)}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/projects", response_class=HTMLResponse)
+async def projects_page(request: Request, error: str = ""):
+    try:
+        async with httpx.AsyncClient(timeout=25) as client:
+            r = await client.get(f"{CLOUD_URL}/api/v1/projects", headers=_headers())
+        projects = r.json().get("projects", []) if r.status_code == 200 else []
+    except Exception as exc:
+        projects = []
+        error = error or f"Không tải được dự án ({exc})."
+    return templates.TemplateResponse(request, "projects.html", {"projects": projects, "error": error or None})
+
+
+@app.post("/projects")
+async def projects_create(request: Request):
+    form = await request.form()
+    data = {k: str(v) for k, v in form.items()}
+    async with httpx.AsyncClient(timeout=40) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects", data=data, headers=_headers())
+    if r.status_code == 200:
+        return RedirectResponse(f"/projects/{r.json().get('id')}", status_code=303)
+    detail = r.json().get("detail", "Không tạo được dự án.") if r.headers.get("content-type", "").startswith("application/json") else "Lỗi."
+    return RedirectResponse(f"/projects?error={quote(detail)}", status_code=303)
+
+
+@app.get("/projects/{project_id}", response_class=HTMLResponse)
+async def project_detail(request: Request, project_id: int):
+    async with httpx.AsyncClient(timeout=25) as client:
+        r = await client.get(f"{CLOUD_URL}/api/v1/projects/{project_id}", headers=_headers())
+    if r.status_code != 200:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dự án.")
+    return templates.TemplateResponse(request, "project_detail.html", {"p": r.json()})
+
+
+@app.post("/projects/{project_id}/documents")
+async def project_documents(project_id: int, request: Request, text: str = Form(""), files: list[UploadFile] = File(default=[])):
+    up = [("files", (f.filename, await f.read(), f.content_type or "application/octet-stream")) for f in files if f and f.filename]
+    async with httpx.AsyncClient(timeout=90) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/documents",
+                              data={"text": text}, files=up or None, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/images")
+async def project_images(project_id: int, images: list[UploadFile] = File(default=[])):
+    up = [("images", (f.filename, await f.read(), f.content_type or "image/jpeg")) for f in images if f and f.filename]
+    async with httpx.AsyncClient(timeout=120) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/images", files=up or None, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/analyze")
+async def project_analyze(project_id: int):
+    async with httpx.AsyncClient(timeout=120) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/analyze", headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/topics")
+async def project_add_topic(project_id: int, title: str = Form(...), angle: str = Form("")):
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics",
+                              data={"title": title, "angle": angle}, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/topics/{topic_id}/delete")
+async def project_delete_topic(project_id: int, topic_id: int):
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.delete(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}", headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/delete")
+async def project_delete(project_id: int):
+    async with httpx.AsyncClient(timeout=30) as client:
+        await client.delete(f"{CLOUD_URL}/api/v1/projects/{project_id}", headers=_headers())
+    return RedirectResponse("/projects", status_code=303)
 
 
 @app.post("/enhance")
