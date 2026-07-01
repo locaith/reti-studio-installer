@@ -41,6 +41,10 @@
           <label class="chip toggle-chip"><input type="checkbox" name="music" value="on" checked><span>Nhạc</span></label>
         </div>
         <div class="prompt-send">
+          <button class="enhance-btn" type="button" data-enhance>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/></svg>
+            Nâng cấp prompt
+          </button>
           <button class="generate-btn" type="submit">Tạo video
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </button>
@@ -80,6 +84,10 @@
           <label class="chip toggle-chip"><input type="checkbox" name="music" value="on" checked><span>Nhạc</span></label>
         </div>
         <div class="prompt-send">
+          <button class="enhance-btn" type="button" data-enhance>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/></svg>
+            Nâng cấp prompt
+          </button>
           <button class="generate-btn" type="submit">Tạo video
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </button>
@@ -133,10 +141,43 @@
     const small = document.querySelector(".uploader small");
     if (small) small.textContent = uploader.files.length ? `Đã chọn ${uploader.files.length} ảnh` : "JPG, PNG, WEBP";
   });
-  // If any video is still processing, refresh the page periodically.
+  // AI enhance: rewrite whatever the user has typed into a stronger prompt.
+  document.querySelectorAll("[data-enhance]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const form = btn.closest("form");
+      const ta = form.querySelector("textarea[name=prompt]");
+      if (!ta || !ta.value.trim()) { ta && ta.focus(); return; }
+      const original = ta.value;
+      btn.disabled = true;
+      const label = btn.querySelector("svg") ? btn.childNodes[btn.childNodes.length - 1] : null;
+      const oldText = label ? label.textContent : "";
+      if (label) label.textContent = " Đang nâng cấp…";
+      try {
+        const fd = new FormData();
+        fd.append("prompt", original);
+        fd.append("duration_seconds", form.querySelector("[name=duration_seconds]")?.value || "8");
+        fd.append("aspect_ratio", form.querySelector("[name=aspect_ratio]")?.value || "16:9");
+        fd.append("video_style", form.querySelector("[name=video_style]")?.value || "cinematic");
+        const r = await fetch("/enhance", { method: "POST", body: fd });
+        const d = await r.json();
+        if (r.ok && d.prompt) ta.value = d.prompt;
+      } catch (e) { /* keep original */ }
+      finally { btn.disabled = false; if (label) label.textContent = oldText; }
+    });
+  });
+  // If any video is still processing, refresh — but NEVER while the user is typing
+  // a prompt (would wipe their text). Wait until the box is empty & unfocused.
   {% if videos %}
   const anyProcessing = {{ 'true' if videos|selectattr('status','in',['pending','running'])|list else 'false' }};
-  if (anyProcessing) setTimeout(() => location.reload(), 5000);
+  if (anyProcessing) {
+    const tick = () => {
+      const busy = [...document.querySelectorAll("textarea")].some((t) => t.value.trim())
+        || ["TEXTAREA", "INPUT"].includes(document.activeElement && document.activeElement.tagName);
+      if (busy) { setTimeout(tick, 4000); return; }
+      location.reload();
+    };
+    setTimeout(tick, 5000);
+  }
   {% endif %}
 </script>
 {% endblock %}
