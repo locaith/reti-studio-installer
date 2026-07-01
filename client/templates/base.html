@@ -35,7 +35,14 @@
           </form>
         </div>
       </aside>
-      <main class="content">{% block content %}{% endblock %}</main>
+      <main class="content">
+        <a id="update-banner" class="update-banner hidden" href="#">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <span class="ut">Có bản cập nhật mới <strong class="uv"></strong> — bấm để cập nhật.</span>
+          <span class="update-cta">Cập nhật →</span>
+        </a>
+        {% block content %}{% endblock %}
+      </main>
     </div>
     <script>
       for (const card of document.querySelectorAll(".video-card")) {
@@ -44,6 +51,36 @@
         card.addEventListener("mouseenter", () => { try { v.currentTime = 0; v.play(); } catch (e) {} });
         card.addEventListener("mouseleave", () => { try { v.pause(); v.currentTime = 0; } catch (e) {} });
       }
+    </script>
+    <script>
+      // Auto-update: check GitHub for a newer installer; offer one-click update.
+      (async () => {
+        try {
+          const u = await (await fetch("/api/update-check")).json();
+          const b = document.getElementById("update-banner");
+          if (u && u.available && u.url && b) {
+            b.querySelector(".uv").textContent = "v" + u.latest;
+            b.dataset.url = u.url;
+            b.classList.remove("hidden");
+          }
+        } catch (e) {}
+      })();
+      document.getElementById("update-banner")?.addEventListener("click", async (e) => {
+        e.preventDefault();
+        const b = e.currentTarget;
+        const ut = b.querySelector(".ut");
+        ut.textContent = "Đang tải bản cập nhật…";
+        try {
+          const fd = new FormData();
+          fd.append("url", b.dataset.url);
+          const r = await fetch("/do-update", { method: "POST", body: fd });
+          ut.textContent = r.ok
+            ? "Đang mở bộ cài — làm theo hướng dẫn để hoàn tất cập nhật."
+            : "Cập nhật thất bại, vui lòng thử lại sau.";
+        } catch (err) {
+          ut.textContent = "Cập nhật thất bại.";
+        }
+      });
     </script>
     {% block scripts %}{% endblock %}
   </body>

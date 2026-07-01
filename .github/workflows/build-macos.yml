@@ -35,21 +35,21 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.1.0.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.2.0.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.1.0.dmg
+          path: dist/RETI-Studio-1.2.0.dmg
 
-      - name: Publish Release
+      - name: Publish to release v1.2.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mac-v1.1.0
-          name: RETI Studio macOS 1.1.0
-          files: dist/RETI-Studio-1.1.0.dmg
+          tag_name: v1.2.0
+          name: RETI Studio 1.2.0
+          files: dist/RETI-Studio-1.2.0.dmg
           body: |
-            Bản macOS (chưa ký số). Mở lần đầu bị Gatekeeper cảnh báo là bình thường:
-            - Chuột phải vào **RETI Studio.app** > **Open** > **Open**, hoặc
-            - Chạy: `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`
+            Bản 1.2.0 — thêm upload logo, tự động cập nhật, token trả trước USD.
+            macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
+            `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`

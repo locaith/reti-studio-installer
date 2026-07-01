@@ -19,6 +19,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
+CLIENT_VERSION = "1.2.0"
+GITHUB_REPO = "locaith/reti-studio-installer"
+
+
+def _parse_ver(value: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(x) for x in value.strip().lstrip("vV").split(".")[:3])
+    except Exception:
+        return (0,)
+
+
+def _is_newer(latest: str, current: str) -> bool:
+    return _parse_ver(latest) > _parse_ver(current)
 
 
 def _frozen() -> bool:
@@ -71,6 +84,57 @@ def health():
     return {"ok": True}
 
 
+@app.get("/api/update-check")
+async def update_check():
+    """Ask GitHub for the latest release; report if a newer installer exists."""
+    result: dict[str, object] = {"available": False, "current": CLIENT_VERSION}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+                headers={"Accept": "application/vnd.github+json"},
+            )
+        if r.status_code != 200:
+            return result
+        data = r.json()
+        latest = (data.get("tag_name") or "").lstrip("vV")
+        want = ".dmg" if sys.platform == "darwin" else ".exe"
+        url = next(
+            (a["browser_download_url"] for a in data.get("assets", []) if a.get("name", "").lower().endswith(want)),
+            None,
+        )
+        result.update({"latest": latest, "url": url, "available": bool(url) and _is_newer(latest, CLIENT_VERSION)})
+    except Exception:
+        pass
+    return result
+
+
+@app.post("/do-update")
+async def do_update(url: str = Form(...)):
+    """Download the new installer and launch it (upgrades in place)."""
+    import subprocess
+    import tempfile
+
+    try:
+        async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+            r = await client.get(url)
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail="Tải bản cập nhật thất bại.")
+        suffix = ".dmg" if sys.platform == "darwin" else ".exe"
+        fd, path = tempfile.mkstemp(suffix=suffix)
+        with os.fdopen(fd, "wb") as f:
+            f.write(r.content)
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            os.startfile(path)  # type: ignore[attr-defined]  (Windows)
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Không mở được bộ cài: {exc}")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, error: str = ""):
     token = load_token()
@@ -121,6 +185,7 @@ async def create(
     duration_seconds: int = Form(30),
     video_style: str = Form("cinematic"),
     images: list[UploadFile] = File(default=[]),
+    logo: UploadFile | None = File(default=None),
 ):
     data = {
         "prompt": prompt,
@@ -129,6 +194,8 @@ async def create(
         "video_style": video_style,
     }
     files = [("images", (f.filename, await f.read(), f.content_type or "image/jpeg")) for f in images if f and f.filename]
+    if logo is not None and logo.filename:
+        files.append(("logo", (logo.filename, await logo.read(), logo.content_type or "image/png")))
     try:
         async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(f"{CLOUD_URL}/api/v1/videos", data=data, files=files or None, headers=_headers())
