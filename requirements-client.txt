@@ -1,5 +1,6 @@
 # Thin client runtime deps (cross-platform). No AI/ffmpeg/moviepy.
 fastapi
+starlette>=0.46,<1.0  # Starlette 1.x breaks FastAPI route registration; pin to 0.x
 uvicorn
 httpx
 jinja2

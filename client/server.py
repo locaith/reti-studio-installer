@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.3.0"
+CLIENT_VERSION = "1.3.1"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 
@@ -265,6 +265,13 @@ async def video_extend(video_id: int, prompt: str = Form("")):
             f"{CLOUD_URL}/api/v1/videos/{video_id}/extend",
             data={"prompt": prompt}, headers=_headers(),
         )
+    return JSONResponse(resp.json(), status_code=resp.status_code)
+
+
+@app.post("/video/{video_id}/retry")
+async def video_retry(video_id: int):
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(f"{CLOUD_URL}/api/v1/videos/{video_id}/retry", headers=_headers())
     return JSONResponse(resp.json(), status_code=resp.status_code)
 
 
