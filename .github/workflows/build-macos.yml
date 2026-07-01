@@ -7,7 +7,7 @@ on:
       - 'client/**'
       - 'client_launcher.py'
       - 'requirements-client.txt'
-      - 'packaging/reti_client_mac.spec'
+      - 'packaging/**'
       - '.github/workflows/build-macos.yml'
 
 permissions:
@@ -29,27 +29,42 @@ jobs:
           pip install -r requirements-client.txt
           pip install pyinstaller
 
+      - name: Make app icon (.icns)
+        run: |
+          mkdir -p icon.iconset
+          sips -z 16 16     packaging/logo1024.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32     packaging/logo1024.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32     packaging/logo1024.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64     packaging/logo1024.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128   packaging/logo1024.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256   packaging/logo1024.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 256 256   packaging/logo1024.png --out icon.iconset/icon_256x256.png
+          sips -z 512 512   packaging/logo1024.png --out icon.iconset/icon_256x256@2x.png
+          sips -z 512 512   packaging/logo1024.png --out icon.iconset/icon_512x512.png
+          cp packaging/logo1024.png icon.iconset/icon_512x512@2x.png
+          iconutil -c icns icon.iconset -o packaging/app.icns
+
       - name: Build .app
         run: pyinstaller packaging/reti_client_mac.spec --noconfirm --clean
 
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.2.0.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.2.1.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.2.0.dmg
+          path: dist/RETI-Studio-1.2.1.dmg
 
-      - name: Publish to release v1.2.0
+      - name: Publish to release v1.2.1
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.0
-          name: RETI Studio 1.2.0
-          files: dist/RETI-Studio-1.2.0.dmg
+          tag_name: v1.2.1
+          name: RETI Studio 1.2.1
+          files: dist/RETI-Studio-1.2.1.dmg
           body: |
-            Bản 1.2.0 — thêm upload logo, tự động cập nhật, token trả trước USD.
+            Bản 1.2.1 — logo/icon ứng dụng mới, upload logo, tự động cập nhật, token trả trước USD.
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`

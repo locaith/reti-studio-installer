@@ -10,6 +10,8 @@ import os
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 PROJECT = os.path.abspath(os.path.join(SPECPATH, ".."))
+_icns = os.path.join(PROJECT, "packaging", "app.icns")
+mac_icon = _icns if os.path.exists(_icns) else None
 
 datas = [
     (os.path.join(PROJECT, "client", "templates"), "templates"),
@@ -42,13 +44,13 @@ coll = COLLECT(exe, a.binaries, a.datas, name="RETI Studio")
 app = BUNDLE(
     coll,
     name="RETI Studio.app",
-    icon=None,
+    icon=mac_icon,
     bundle_identifier="com.locaith.retistudio",
     info_plist={
         "CFBundleName": "RETI Studio",
         "CFBundleDisplayName": "RETI Studio",
-        "CFBundleShortVersionString": "1.2.0",
-        "CFBundleVersion": "1.2.0",
+        "CFBundleShortVersionString": "1.2.1",
+        "CFBundleVersion": "1.2.1",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "11.0",
     },
