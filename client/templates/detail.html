@@ -118,12 +118,19 @@
   .dl-list a:hover{background:rgba(255,255,255,.07)}
   .dl-list a small{color:var(--sub)}
   .hidden{display:none !important}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:#1b1c1f;border:1px solid var(--line);border-radius:12px;padding:12px 18px;font-size:13px;
+    display:flex;align-items:center;gap:10px;z-index:100;box-shadow:0 14px 34px rgba(0,0,0,.5);transition:.25s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+  .toast .ok{color:#5fe08a}
+  .toast a{color:#ff8a5c;cursor:pointer}
 </style>
 </head>
 <body>
 <div class="editor" id="root"
      data-video-id="{{ v.id }}" data-ratio="{{ v.aspect_ratio }}" data-status="{{ v.status }}"
-     data-progress="{{ v.progress or 4 }}">
+     data-progress="{{ v.progress or 4 }}" data-autosave="{{ 'on' if auto_save else 'off' }}"
+     data-storage="{{ storage_dir }}" data-title="{{ (v.prompt or '')[:48] }}">
 
   <!-- TOP BAR -->
   <header class="top">
@@ -140,10 +147,11 @@
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>
       </button>
       <div class="dl-list hidden" id="dl-list">
-        <a href="/video/{{ v.id }}/download?quality=original" download="reti-{{ v.id }}.mp4">Bản gốc <small>cao nhất</small></a>
-        <a href="/video/{{ v.id }}/download?quality=1080" download="reti-{{ v.id }}-1080p.mp4">Full HD <small>1080p</small></a>
-        <a href="/video/{{ v.id }}/download?quality=720" download="reti-{{ v.id }}-720p.mp4">HD <small>720p</small></a>
-        <a href="/video/{{ v.id }}/download?quality=480" download="reti-{{ v.id }}-480p.mp4">Nhẹ <small>480p</small></a>
+        <a href="#" data-q="original">Bản gốc <small>cao nhất</small></a>
+        <a href="#" data-q="1080">Full HD <small>1080p</small></a>
+        <a href="#" data-q="720">HD <small>720p</small></a>
+        <a href="#" data-q="480">Nhẹ <small>480p</small></a>
+        <a href="#" id="open-folder-a" style="border-top:1px solid var(--line);margin-top:4px;padding-top:11px">Mở thư mục lưu <small>↗</small></a>
       </div>
     </div>
     <button class="pill" id="journal-toggle">
@@ -209,6 +217,7 @@
     <div class="emsg hidden" id="emsg"></div>
   </div>
   <div class="foot-note">RETI Studio dùng Google Veo — hãy xác minh nội dung do AI tạo.</div>
+  <div class="toast" id="toast"></div>
 </div>
 
 <script>
@@ -366,7 +375,16 @@ async function doRetry(){
 
 /* ---- extend (edit bar) ---- */
 const input=document.getElementById('edit-input'), sendBtn=document.getElementById('send'), emsg=document.getElementById('emsg');
-function focusEdit(){input.focus();input.scrollIntoView({block:'nearest'});}
+const SUGGESTIONS=[
+  'Tiếp nối liền mạch cảnh trước: máy quay lướt tới, tiến sâu hơn vào không gian, hé lộ thêm khu vực mới, chuyển động mượt, giữ nguyên ánh sáng và tông màu điện ảnh.',
+  'Máy quay tiếp tục di chuyển chậm rãi, khám phá chi tiết mới của khung cảnh, ánh sáng tự nhiên, phong cách quay điện ảnh nhất quán với cảnh trước.',
+  'Cảnh chuyển tiếp mượt mà: góc quay rộng dần ra, lộ toàn cảnh bao quát, giữ nguyên nhân vật, bối cảnh, ánh sáng và tâm trạng của cảnh trước.',
+];
+let sugIdx=0;
+function focusEdit(){
+  if(!input.value.trim()){input.value=SUGGESTIONS[sugIdx%SUGGESTIONS.length];sugIdx++;}
+  input.focus();input.select();input.scrollIntoView({block:'nearest'});
+}
 document.getElementById('add-inline').onclick=focusEdit;
 input.addEventListener('keydown',e=>{if(e.key==='Enter')doExtend();});
 sendBtn.onclick=doExtend;
@@ -382,10 +400,33 @@ async function doExtend(){
   finally{sendBtn.disabled=false;}
 }
 
-/* ---- download menu ---- */
+/* ---- download = save to THIS machine ---- */
 const dlList=document.getElementById('dl-list');
 document.getElementById('dl-toggle').onclick=e=>{e.stopPropagation();dlList.classList.toggle('hidden');};
 document.addEventListener('click',()=>dlList.classList.add('hidden'));
+const toast=document.getElementById('toast');
+let toastTimer;
+function showToast(html,ms=5000){toast.innerHTML=html;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),ms);}
+const vtitle=root.dataset.title||'';
+async function saveVideo(q){
+  showToast('<span class="mini-spin"></span> Đang lưu video về máy…',60000);
+  try{
+    const fd=new FormData();fd.append('title',vtitle);
+    const r=await fetch(`/save/${videoId}?quality=${q}`,{method:'POST',body:fd});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok)showToast(`<span class="ok">✓</span> Đã lưu vào máy. <a id="t-open">Mở thư mục</a>`);
+    else showToast('Không lưu được: '+(d.detail||'thử lại'),4000);
+    const to=document.getElementById('t-open');if(to)to.onclick=openFolder;
+  }catch(e){showToast('Lỗi khi lưu, thử lại.',4000);}
+}
+async function openFolder(){try{await fetch('/open-folder',{method:'POST'});}catch(e){}}
+dlList.querySelectorAll('a[data-q]').forEach(a=>a.onclick=e=>{e.preventDefault();dlList.classList.add('hidden');saveVideo(a.dataset.q);});
+document.getElementById('open-folder-a').onclick=e=>{e.preventDefault();dlList.classList.add('hidden');openFolder();};
+
+/* auto-save once when the video first completes */
+let autoSaved=false;
+const AUTO_SAVE=root.dataset.autosave==='on';
+function maybeAutoSave(){if(AUTO_SAVE&&!autoSaved){autoSaved=true;saveVideo('original');}}
 
 /* ---- refresh player after new clip ---- */
 function refreshPlayer(){const t=player.currentTime||0;player.src=`/video/${videoId}/download?_=${Date.now()}`;player.load();ov.classList.add('hidden');ov.classList.remove('fail');builtFor='';}
@@ -399,7 +440,7 @@ async function poll(){
     ]);
     const clips=(cl&&cl.clips)||[];renderJournal(clips);
     const done=clips.filter(c=>c.status==='completed').length;
-    if(sv.status==='completed'){failed=false;realP=100;if(running||done!==lastCompleted)refreshPlayer();running=false;}
+    if(sv.status==='completed'){failed=false;realP=100;if(running||done!==lastCompleted)refreshPlayer();running=false;maybeAutoSave();}
     else if(sv.status==='failed'){if(!failed)showFailed(sv.error,sv.can_retry!==false);}
     else{failed=false;running=true;realP=Math.max(4,Math.min(97,Number(sv.progress||0)));
       const l=document.getElementById('ov-lab');if(l)l.textContent=stageLabel(sv.status,realP);ov.classList.remove('hidden');}

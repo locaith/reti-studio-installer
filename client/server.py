@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.3.2"
+CLIENT_VERSION = "1.3.3"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 
@@ -56,18 +56,55 @@ def _config_path() -> Path:
     return base / "client.json"
 
 
-def load_token() -> str:
+def load_config() -> dict:
     path = _config_path()
     if path.exists():
         try:
-            return json.loads(path.read_text(encoding="utf-8")).get("token", "")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
         except Exception:
-            return ""
-    return ""
+            return {}
+    return {}
+
+
+def save_config(cfg: dict) -> None:
+    _config_path().write_text(json.dumps(cfg), encoding="utf-8")
+
+
+def load_token() -> str:
+    return load_config().get("token", "")
 
 
 def save_token(token: str) -> None:
-    _config_path().write_text(json.dumps({"token": token}), encoding="utf-8")
+    cfg = load_config()
+    cfg["token"] = token
+    save_config(cfg)
+
+
+def default_storage_dir() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Movies" / "RETI Studio"
+    return Path.home() / "Videos" / "RETI Studio"
+
+
+def get_storage_dir() -> Path:
+    raw = (load_config().get("storage_dir") or "").strip()
+    path = Path(raw) if raw else default_storage_dir()
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        path = default_storage_dir()
+        path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def get_auto_save() -> bool:
+    return bool(load_config().get("auto_save", True))
+
+
+def _safe_name(text: str, limit: int = 48) -> str:
+    keep = "".join(c if (c.isalnum() or c in " -_") else " " for c in (text or ""))
+    return " ".join(keep.split())[:limit].strip() or "video"
 
 
 templates = Jinja2Templates(directory=str(_resource_dir() / "templates"))
@@ -178,6 +215,71 @@ def logout():
     return RedirectResponse("/", status_code=303)
 
 
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request, saved: str = ""):
+    return templates.TemplateResponse(
+        request, "settings.html",
+        {"storage_dir": str(get_storage_dir()), "auto_save": get_auto_save(),
+         "default_dir": str(default_storage_dir()), "saved": saved},
+    )
+
+
+@app.post("/settings")
+async def settings_save(request: Request, storage_dir: str = Form(""), auto_save: str = Form("off")):
+    cfg = load_config()
+    chosen = storage_dir.strip()
+    if chosen:
+        try:
+            Path(chosen).mkdir(parents=True, exist_ok=True)
+            cfg["storage_dir"] = chosen
+        except Exception:
+            return templates.TemplateResponse(
+                request, "settings.html",
+                {"storage_dir": str(get_storage_dir()), "auto_save": get_auto_save(),
+                 "default_dir": str(default_storage_dir()),
+                 "error": "Không tạo được thư mục này. Kiểm tra lại đường dẫn."},
+            )
+    cfg["auto_save"] = (auto_save == "on")
+    save_config(cfg)
+    return RedirectResponse("/settings?saved=1", status_code=303)
+
+
+@app.post("/save/{video_id}")
+async def save_video(video_id: int, quality: str = "original", title: str = Form("")):
+    """Download the finished video from the cloud and save it onto THIS machine
+    (the customer's own disk), in the configured storage folder."""
+    async with httpx.AsyncClient(timeout=600) as client:
+        resp = await client.get(
+            f"{CLOUD_URL}/api/v1/videos/{video_id}/download",
+            params={"quality": quality}, headers=_headers(),
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=404, detail="Video chưa sẵn sàng để tải.")
+    folder = get_storage_dir()
+    tag = "" if quality == "original" else f"-{quality}p"
+    name = f"{_safe_name(title) or ('reti-' + str(video_id))}-{video_id}{tag}.mp4"
+    dest = folder / name
+    try:
+        dest.write_bytes(resp.content)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Không lưu được file: {exc}")
+    return {"ok": True, "path": str(dest), "folder": str(folder)}
+
+
+@app.post("/open-folder")
+def open_folder():
+    folder = get_storage_dir()
+    try:
+        if sys.platform == "darwin":
+            import subprocess
+            subprocess.Popen(["open", str(folder)])
+        else:
+            os.startfile(str(folder))  # type: ignore[attr-defined]
+        return {"ok": True, "folder": str(folder)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.post("/enhance")
 async def enhance(
     prompt: str = Form(...),
@@ -239,7 +341,10 @@ async def video_page(request: Request, video_id: int):
         resp = await client.get(f"{CLOUD_URL}/api/v1/videos/{video_id}", headers=_headers())
     if resp.status_code != 200:
         raise HTTPException(status_code=404, detail="Không tìm thấy video.")
-    return templates.TemplateResponse(request, "detail.html", {"v": resp.json()})
+    return templates.TemplateResponse(
+        request, "detail.html",
+        {"v": resp.json(), "auto_save": get_auto_save(), "storage_dir": str(get_storage_dir())},
+    )
 
 
 @app.get("/api/video/{video_id}")

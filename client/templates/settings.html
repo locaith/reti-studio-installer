@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<header class="topbar">
+  <div>
+    <p class="eyebrow">RETI Studio</p>
+    <h1 class="topbar-title">Cài đặt</h1>
+  </div>
+</header>
+
+{% if saved %}<div class="alert" style="background:rgba(45,180,90,.14);border-color:rgba(45,180,90,.4);color:#8ff0b0">Đã lưu cài đặt.</div>{% endif %}
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+<section class="panel" style="max-width:760px">
+  <h2>Lưu trữ video trên máy này</h2>
+  <p class="prose" style="color:#9aa0a6;margin-bottom:18px">
+    Video sau khi tạo sẽ được lưu vào máy của bạn tại thư mục dưới đây. Nhờ vậy bạn giữ được bản gốc
+    ngay trên máy mình, không phụ thuộc máy chủ.
+  </p>
+
+  <form action="/settings" method="post" style="display:flex;flex-direction:column;gap:18px">
+    <label style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-weight:600;font-size:14px">Thư mục lưu video</span>
+      <div style="display:flex;gap:10px">
+        <input name="storage_dir" value="{{ storage_dir }}" spellcheck="false"
+          style="flex:1;background:#0e0f13;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:11px 14px;color:#eef0f5;font-size:14px;outline:none">
+        <button class="ghost-btn" type="button" id="open-folder">Mở thư mục</button>
+      </div>
+      <small style="color:#6b7077">Mặc định: {{ default_dir }}</small>
+    </label>
+
+    <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+      <input type="checkbox" name="auto_save" value="on" {% if auto_save %}checked{% endif %}
+        style="width:18px;height:18px;accent-color:#ff4657">
+      <span>
+        <strong style="font-size:14px">Tự động lưu khi tạo xong</strong><br>
+        <small style="color:#8b90a0">Video hoàn tất sẽ tự lưu vào thư mục trên (không cần bấm Tải về).</small>
+      </span>
+    </label>
+
+    <div>
+      <button class="generate-btn" type="submit" style="border:0">Lưu cài đặt</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel" style="max-width:760px">
+  <h2>Về dung lượng máy chủ</h2>
+  <p class="prose" style="color:#9aa0a6">
+    Việc lưu bản gốc trên máy khách giúp giảm tải cho máy chủ: khách giữ video của mình, không cần tải đi
+    tải lại từ máy chủ. Bản trên máy chủ chỉ giữ tạm để xem lại/kéo dài trong một thời gian.
+  </p>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById("open-folder")?.addEventListener("click", async () => {
+    try { await fetch("/open-folder", { method: "POST" }); } catch (e) {}
+  });
+</script>
+{% endblock %}
