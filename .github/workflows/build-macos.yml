@@ -50,24 +50,24 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.4.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.5.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.6.4.dmg
+          path: dist/RETI-Studio-1.6.5.dmg
 
-      - name: Publish to release v1.6.4
+      - name: Publish to release v1.6.5
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.4
-          name: RETI Studio 1.6.4
-          files: dist/RETI-Studio-1.6.4.dmg
+          tag_name: v1.6.5
+          name: RETI Studio 1.6.5
+          files: dist/RETI-Studio-1.6.5.dmg
           body: |
-            Bản 1.6.4 — SỬA LỖI mở app ra trình duyệt: khi mở app (nhất là mở lại ngay sau khi
-            đóng, hoặc lỡ mở nhiều lần) app bị nhảy ra web thay vì cửa sổ app. Nay: mỗi máy có
-            thư mục WebView2 riêng, chống mở trùng (mở lần 2 không gây lỗi cổng), ép đúng nhân
-            hiển thị → app luôn mở bằng cửa sổ ứng dụng.
+            Bản 1.6.5 — SỬA DỨT ĐIỂM lỗi app mở ra trình duyệt thay vì cửa sổ app. Nguyên nhân:
+            một tệp thư viện hiển thị (WebView2 Core.dll) bị hỏng/rỗng khi đóng gói nên cửa sổ
+            ứng dụng không tạo được → app rơi ra web. Nay đã nhúng lại tệp đúng + ghi log chẩn
+            đoán + nếu vẫn lỗi thì mở ở chế độ "cửa sổ ứng dụng" (không thanh địa chỉ).
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`

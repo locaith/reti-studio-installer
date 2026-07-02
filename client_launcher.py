@@ -10,6 +10,27 @@ import os
 import sys
 import threading
 import time
+import traceback
+
+
+def _log_dir() -> str:
+    if sys.platform == "darwin":
+        d = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "RETI Studio")
+    else:
+        d = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "RETI Studio")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _log(msg: str) -> None:
+    """Write a diagnostic line straight to client.log — independent of whether
+    stdout/stderr got redirected. Frozen windowed builds sometimes leave stdout
+    non-None, so print()-based logging silently vanished; this always writes."""
+    try:
+        with open(os.path.join(_log_dir(), "client.log"), "a", encoding="utf-8") as f:
+            f.write(msg.rstrip() + "\n")
+    except Exception:
+        pass
 
 
 def _ensure_ca_bundle() -> None:
@@ -123,9 +144,34 @@ def _setup_webview_env() -> None:
         pass
 
 
+def _open_app_window(url: str) -> bool:
+    """Fallback when pywebview can't create a native window: open Edge/Chrome in
+    --app mode (a clean frameless window, no tabs/address bar) so it still looks
+    like an app, not a browser tab. Returns True if a browser was launched."""
+    import subprocess
+
+    candidates = [
+        os.path.join(os.environ.get("ProgramFiles(x86)", ""), r"Microsoft\Edge\Application\msedge.exe"),
+        os.path.join(os.environ.get("ProgramFiles", ""), r"Microsoft\Edge\Application\msedge.exe"),
+        os.path.join(os.environ.get("ProgramFiles", ""), r"Google\Chrome\Application\chrome.exe"),
+        os.path.join(os.environ.get("ProgramFiles(x86)", ""), r"Google\Chrome\Application\chrome.exe"),
+    ]
+    for exe in candidates:
+        if exe and os.path.exists(exe):
+            try:
+                subprocess.Popen([exe, f"--app={url}", "--window-size=1360,900", "--new-window"])
+                _log(f"fallback: opened app-mode window via {exe}")
+                return True
+            except Exception as e:
+                _log(f"fallback app-mode failed for {exe}: {e!r}")
+    return False
+
+
 def main() -> int:
     _ensure_streams()
+    _log(f"=== launch: frozen={getattr(sys, 'frozen', False)} argv={sys.argv} ===")
     _setup_webview_env()
+    _log(f"WEBVIEW2_USER_DATA_FOLDER={os.environ.get('WEBVIEW2_USER_DATA_FOLDER')}")
     host, port = "127.0.0.1", 17650
     url = f"http://{host}:{port}/"
 
@@ -134,11 +180,13 @@ def main() -> int:
     # webview (the cause of the "opens in a browser" symptom). Just point the
     # window at the running instance instead.
     if _is_up(url + "health"):
+        _log("existing instance detected on 17650 -> not starting a 2nd server")
         ready = True
     else:
         server = _make_server(host, port)
         threading.Thread(target=server.run, daemon=True).start()
         ready = _wait_for_http(url + "health")
+    _log(f"server ready={ready}")
 
     if "--selftest" in sys.argv:
         print(f"CLIENT SELFTEST: {'OK' if ready else 'FAIL'} {url}")
@@ -147,19 +195,26 @@ def main() -> int:
     try:
         import webview
 
+        _log(f"webview imported ver={getattr(webview, '__version__', '?')}; creating window")
         webview.create_window("RETI Studio", url, width=1360, height=900, min_size=(1024, 680))
         try:
+            _log("webview.start(gui='edgechromium')")
             webview.start(gui="edgechromium")
+            _log("webview closed normally (edgechromium)")
         except Exception as start_exc:
-            # Fresh window + default backend as a second try before giving up.
-            print(f"edgechromium start failed ({start_exc}); retrying default backend.", file=sys.stderr)
+            _log("edgechromium FAILED:\n" + traceback.format_exc())
             webview.create_window("RETI Studio", url, width=1360, height=900, min_size=(1024, 680))
+            _log("webview.start() default backend")
             webview.start()
+            _log("webview closed normally (default)")
     except Exception as exc:
-        import webbrowser
+        _log("WEBVIEW UNAVAILABLE:\n" + traceback.format_exc())
+        # Prefer a clean app-mode window over a raw browser tab.
+        if not _open_app_window(url):
+            import webbrowser
 
-        print(f"Desktop window unavailable ({exc}); opening in browser.", file=sys.stderr)
-        webbrowser.open(url)
+            _log(f"app-mode unavailable; plain browser for {exc}")
+            webbrowser.open(url)
         try:
             while True:
                 time.sleep(1)
