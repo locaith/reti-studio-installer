@@ -42,10 +42,15 @@
   .editor-box{background:#101218;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px;margin:-4px 0 12px}
   .editor-box .eh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
   .editor-box .eh b{font-size:13.5px}
-  .scene{background:#15161d;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:10px}
-  .scene .sn{font-size:11px;font-weight:700;color:#ff8a5c;margin-bottom:8px}
-  .scene textarea,.scene input,.editor-box .top input,.editor-box .top textarea{width:100%;background:#0e0f13;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#eef0f5;font-size:13px;outline:none;font-family:inherit;margin-bottom:7px;resize:vertical;line-height:1.5}
-  .scene label,.editor-box .top label{font-size:11px;color:#8b90a0;display:block;margin-bottom:3px}
+  .scene{display:block;background:#15161d;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;margin-bottom:12px}
+  .scene .sn{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:#ff8a5c;text-transform:uppercase;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:8px}
+  .scene .sn .dur{color:#8b90a0;font-weight:600}
+  .scene textarea,.scene input,.editor-box .top input,.editor-box .top textarea{width:100%;background:#0e0f13;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#eef0f5;font-size:13px;outline:none;font-family:inherit;margin-bottom:8px;resize:vertical;line-height:1.5}
+  .scene label,.editor-box .top label{font-size:11px;color:#8b90a0;display:block;margin-bottom:3px;margin-top:2px}
+  .seg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .seg-ctrls{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .seg-ctrls select{width:100%;margin-bottom:0}
+  .seg-ctrls>div{min-width:0}
   .editor-box .erow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
   .editor-box select{background:#15161d;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 10px;color:#eef0f5;font-size:13px}
 </style>
@@ -202,50 +207,71 @@
     const box=document.querySelector(`.editor-box[data-for="${tid}"]`);
     if(!box.hidden){box.hidden=true;return;}
     let s=readScript(tid);
-    if(!s||!s.scenes){
-      box.hidden=false;box.innerHTML='<div class="muted"><span class="mini-spin" style="display:inline-block;vertical-align:middle"></span> Đang tạo kịch bản bán hàng…</div>';
-      const {ok,data}=await post(`/projects/${pid}/topics/${tid}/script`, {duration_seconds:24}, false);
+    if(!s||!s.segments){
+      box.hidden=false;box.innerHTML='<div class="muted"><span class="mini-spin" style="display:inline-block;vertical-align:middle"></span> Đang viết kịch bản TVC…</div>';
+      const {ok,data}=await post(`/projects/${pid}/topics/${tid}/script`, {duration_seconds:28}, false);
       if(!ok){box.innerHTML='<div class="muted">Lỗi tạo kịch bản: '+((data&&data.detail)||'')+'</div>';return;}
       s=data.script;document.getElementById('script-'+tid).textContent=JSON.stringify(s);
     }
     renderEditor(box,tid,s);box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
 
+  const MOVES=[['slow_dolly_in','Đẩy máy chậm'],['tracking_pan','Lia ngang'],['drone_reveal','Flycam mở cảnh'],['orbit','Xoay quanh'],['interior_to_view_push','Từ trong ra view'],['static','Tĩnh']];
+  const MODES=[['image_to_video','AI từ ảnh dự án'],['text_to_video','AI từ mô tả'],['uploaded_footage','Video thật (tải lên)']];
+  const GRADS=[['orange','Cam'],['green','Xanh lá'],['blue','Xanh dương'],['silver','Bạc'],['gold','Vàng']];
+  const DURS=[4,6,8];
+  function opts(list,val){return list.map(o=>{const v=Array.isArray(o)?o[0]:o,t=Array.isArray(o)?o[1]:o;return `<option value="${v}"${String(v)===String(val)?' selected':''}>${t}</option>`}).join('')}
+
   function renderEditor(box,tid,s){
-    const scenes=(s.scenes||[]).map((sc,i)=>`
-      <div class="scene">
-        <div class="sn">CẢNH ${sc.scene||i+1}</div>
-        <label>Hình ảnh / cảnh quay</label><textarea data-f="visual" rows="2">${esc(sc.visual)}</textarea>
-        <label>Chữ trên màn hình</label><input data-f="caption" value="${esc(sc.caption)}">
-        <label>Lời thuyết minh</label><textarea data-f="voiceover" rows="2">${esc(sc.voiceover)}</textarea>
+    const segs=(s.segments||[]).map((sc,i)=>`
+      <div class="scene" data-seg>
+        <div class="sn"><span>Phân đoạn ${sc.position||i+1} · ${esc(sc.kind||'')}</span><span class="dur"><span data-seglen>${sc.duration_seconds||6}</span>s</span></div>
+        <label>Lời đọc (voice nam)</label><textarea data-f="voiceover_vi" rows="2">${esc(sc.voiceover_vi)}</textarea>
+        <div class="seg-row">
+          <div><label>Chữ dẫn (viết tay)</label><input data-f="script_line" value="${esc(sc.script_line)}"></div>
+          <div><label>Tiêu đề (in đậm)</label><input data-f="headline_caps" value="${esc(sc.headline_caps)}"></div>
+        </div>
+        <label>Cảnh quay (mô tả hình ảnh)</label><textarea data-f="subject" rows="2">${esc(sc.subject)}</textarea>
+        <div class="seg-ctrls">
+          <div><label>Máy quay</label><select data-f="camera_move">${opts(MOVES,sc.camera_move)}</select></div>
+          <div><label>Nguồn cảnh</label><select data-f="generation_mode">${opts(MODES,sc.generation_mode)}</select></div>
+          <div><label>Màu chữ</label><select data-f="gradient">${opts(GRADS,sc.gradient)}</select></div>
+          <div><label>Thời lượng</label><select data-f="duration_seconds">${opts(DURS,sc.duration_seconds)}</select></div>
+        </div>
       </div>`).join('');
-    box.dataset.duration=s.duration_seconds||24;
     box.innerHTML=`
-      <div class="eh"><b>Kịch bản: ${esc(s.title||'')}</b><button class="del close-ed">×</button></div>
-      <div class="top"><label>Câu mở đầu (hook)</label><input data-h="hook" value="${esc(s.hook)}"></div>
-      <div class="scenes">${scenes}</div>
-      <div class="top"><label>Kêu gọi hành động (CTA)</label><input data-h="cta" value="${esc(s.cta)}"></div>
+      <div class="eh"><b>Kịch bản TVC: ${esc(s.title||'')} · ~${s.duration_seconds||0}s</b><button class="del close-ed">×</button></div>
+      <div class="scenes">${segs}</div>
+      <div class="top"><label>Kêu gọi hành động (CTA) — kết poster</label><input data-h="cta" value="${esc(s.cta)}"></div>
+      <div class="top"><label>Từ khóa bình luận</label><input data-h="keyword" value="${esc(s.keyword)}" style="max-width:220px"></div>
       <div class="erow">
-        <select data-h="aspect"><option value="16:9">16:9 ngang</option><option value="9:16">9:16 dọc</option></select>
+        <select data-h="aspect"><option value="9:16">9:16 dọc (reels)</option><option value="16:9">16:9 ngang</option></select>
         <select data-h="quality"><option value="standard">HD 720p</option><option value="high">Full HD 1080p</option></select>
         <button class="btn btn-g" data-act="save">Lưu nháp</button>
         <button class="btn btn-p" data-act="produce">Duyệt & Dựng video →</button>
         <span class="muted ed-msg"></span>
       </div>`;
+    box.querySelectorAll('[data-f="duration_seconds"]').forEach(sel=>sel.onchange=()=>{
+      const card=sel.closest('[data-seg]'); card.querySelector('[data-seglen]').textContent=sel.value+'s';});
     box.querySelector('.close-ed').onclick=()=>box.hidden=true;
     box.querySelector('[data-act="save"]').onclick=()=>saveScript(tid,box,false);
     box.querySelector('[data-act="produce"]').onclick=()=>saveScript(tid,box,true);
   }
 
   function collectScript(box,tid){
-    const scenes=[...box.querySelectorAll('.scene')].map((el,i)=>({
-      scene:i+1,
-      visual:el.querySelector('[data-f="visual"]').value,
-      caption:el.querySelector('[data-f="caption"]').value,
-      voiceover:el.querySelector('[data-f="voiceover"]').value,
-    }));
-    return {title:readScript(tid).title||'', hook:box.querySelector('[data-h="hook"]').value,
-            cta:box.querySelector('[data-h="cta"]').value, duration_seconds:Number(box.dataset.duration)||24, scenes};
+    const prev=readScript(tid);
+    const segments=[...box.querySelectorAll('[data-seg]')].map((el,i)=>{
+      const g=f=>{const n=el.querySelector(`[data-f="${f}"]`);return n?n.value:''};
+      return {position:i+1, kind:(prev.segments&&prev.segments[i]&&prev.segments[i].kind)||'',
+        voiceover_vi:g('voiceover_vi'), script_line:g('script_line'), headline_caps:g('headline_caps'),
+        subject:g('subject'), camera_move:g('camera_move'), generation_mode:g('generation_mode'),
+        gradient:g('gradient'), duration_seconds:Number(g('duration_seconds'))||6,
+        source_asset_order:(prev.segments&&prev.segments[i])?prev.segments[i].source_asset_order:null,
+        mood:(prev.segments&&prev.segments[i])?prev.segments[i].mood:''};
+    });
+    return {title:prev.title||'', signature_gradient:prev.signature_gradient||'orange',
+            keyword:box.querySelector('[data-h="keyword"]').value, cta:box.querySelector('[data-h="cta"]').value,
+            duration_seconds:segments.reduce((a,s)=>a+(s.duration_seconds||0),0), segments};
   }
 
   async function saveScript(tid,box,approve){
