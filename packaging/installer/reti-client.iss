@@ -1,8 +1,8 @@
-; Inno Setup script for the RETI Studio thin client (cloud-backed) — customer deliverable.
+﻿; Inno Setup script for the RETI Studio thin client (cloud-backed) â€” customer deliverable.
 ; Compile from project root (after building the client): ISCC packaging\installer\reti-client.iss
 
 #define MyAppName "RETI Studio"
-#define MyAppVersion "1.5.1"
+#define MyAppVersion "1.6.0"
 #define MyAppPublisher "RETI Home"
 #define MyAppURL "https://locaith.com"
 #define MyAppExeName "RETI Studio.exe"

@@ -335,10 +335,21 @@
     driveBox.querySelectorAll('.drive-pick').forEach(b=>b.onclick=()=>driveImport(b.dataset.fid,b));
   };
   async function driveImport(fid,btn){
-    btn.disabled=true;const t=btn.textContent;btn.textContent='Đang nhập ảnh…';
-    const {ok,data}=await post(`/projects/${pid}/drive/import`, {folder_id:fid}, false);
-    if(ok){showToast(`Đã nhập ${data.added} ảnh từ Drive.`);setTimeout(()=>location.reload(),800);}
-    else{btn.disabled=false;btn.textContent=t;showToast('Lỗi: '+((data&&data.detail)||''));}
+    btn.disabled=true;btn.textContent='Đang đọc danh sách…';
+    const lr=await post(`/projects/${pid}/drive/list-images`, {folder_id:fid}, false);
+    const imgs=(lr.ok&&lr.data.images)||[];
+    if(!imgs.length){showToast('Thư mục này không có ảnh.');btn.disabled=false;btn.textContent='Nhập ảnh';return;}
+    driveBox.innerHTML='<div class="muted">Đang đồng bộ ảnh: <b id="dprog">0</b>/'+imgs.length+'</div>'+
+      '<div style="height:9px;background:rgba(255,255,255,.1);border-radius:6px;margin-top:8px;overflow:hidden"><i id="dbar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#ff4657,#ff9a4d);transition:width .2s"></i></div>';
+    let done=0;
+    for(const im of imgs){
+      try{const fd=new FormData();fd.append('file_id',im.id);fd.append('name',im.name||'image.jpg');
+        await fetch(`/projects/${pid}/drive/import-one`,{method:'POST',body:fd});}catch(e){}
+      done++;
+      const dp=document.getElementById('dprog'),db=document.getElementById('dbar');
+      if(dp)dp.textContent=done; if(db)db.style.width=(done/imgs.length*100)+'%';
+    }
+    showToast(`Đã đồng bộ ${done} ảnh từ Drive.`);setTimeout(()=>location.reload(),800);
   }
   // If a Drive link was entered when creating the project and no images imported yet,
   // auto-list the folders so the user can pick right away.

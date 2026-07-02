@@ -50,23 +50,23 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.5.1.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.0.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.5.1.dmg
+          path: dist/RETI-Studio-1.6.0.dmg
 
-      - name: Publish to release v1.5.1
+      - name: Publish to release v1.6.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.5.1
-          name: RETI Studio 1.5.1
-          files: dist/RETI-Studio-1.5.1.dmg
+          tag_name: v1.6.0
+          name: RETI Studio 1.6.0
+          files: dist/RETI-Studio-1.6.0.dmg
           body: |
-            Bản 1.5.1 — TVC dài hơn & chuẩn agency (chuyển cảnh crossfade + chữ động + SFX + voice nam + phụ đề + poster/CTA).
-            Thêm: ĐỒNG BỘ GOOGLE DRIVE (dán link thư mục → chọn folder dự án → tự lấy ảnh), chọn ĐỘ DÀI kịch bản (24/36/45s),
-            và TIMELINE kiểu CapCut (kéo đổi thứ tự · sửa số giây · xoá đoạn → ghép lại KHÔNG tốn thêm token).
+            Bản 1.6.0 — Bám ẢNH THẬT của dự án: AI đọc hiểu ảnh → ghép đúng ảnh vào đúng cảnh (video giống dự án hơn hẳn).
+            POSTER kết dày & đẹp (ảnh hero + điểm nổi bật + giá + CTA). Nhạc XUYÊN SUỐT (bỏ tiếng xẹt chuyển cảnh).
+            Đồng bộ Drive có % tiến trình; dựng video hiện "đang dựng cảnh mấy"; timeline gọn: nút Chỉnh sửa + sửa/xoá/đổi thứ tự.
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`
