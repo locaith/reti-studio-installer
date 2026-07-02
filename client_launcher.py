@@ -12,6 +12,46 @@ import threading
 import time
 
 
+def _ensure_ca_bundle() -> None:
+    """Point OpenSSL/httpx at a real CA-certificate bundle.
+
+    In the frozen (PyInstaller) build ``certifi.where()`` can resolve to a path
+    inside the PYZ archive that has no real file on disk, leaving the SSL trust
+    store empty -> ``[X509: NO_CERTIFICATE_OR_CRL_FOUND]`` on every HTTPS call
+    (this is what makes activation fail with "Không kết nối được máy chủ"). httpx
+    0.28 checks ``SSL_CERT_FILE`` before certifi, so exporting a valid bundled
+    path fixes it regardless of freeze quirks or a Windows cert store that isn't
+    ready yet right after a reboot.
+    """
+    cur = os.environ.get("SSL_CERT_FILE")
+    if cur and os.path.isfile(cur) and os.path.getsize(cur) > 0:
+        return
+    candidates = []
+    if getattr(sys, "frozen", False):
+        base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(sys.executable))
+        candidates.append(os.path.join(base, "certifi", "cacert.pem"))
+        candidates.append(os.path.join(base, "cacert.pem"))
+    try:
+        import certifi
+
+        candidates.append(certifi.where())
+    except Exception:
+        pass
+    for path in candidates:
+        try:
+            if path and os.path.isfile(path) and os.path.getsize(path) > 0:
+                os.environ["SSL_CERT_FILE"] = path
+                os.environ.setdefault("SSL_CERT_DIR", os.path.dirname(path))
+                os.environ.setdefault("REQUESTS_CA_BUNDLE", path)
+                return
+        except Exception:
+            continue
+
+
+# Must run before client.server (and therefore httpx) is imported.
+_ensure_ca_bundle()
+
+
 def _ensure_streams() -> None:
     if sys.stdout is not None and sys.stderr is not None:
         return

@@ -17,8 +17,11 @@ datas = [
     (os.path.join(PROJECT, "client", "templates"), "templates"),
     (os.path.join(PROJECT, "client", "static"), "static"),
 ]
+# CA bundle for httpx/TLS — httpx 0.28 imports certifi lazily so PyInstaller no
+# longer auto-collects cacert.pem; bundle it explicitly (see reti_client.spec).
+datas += collect_data_files("certifi")
 
-hiddenimports = collect_submodules("uvicorn") + ["anyio", "h11", "httpx", "httpcore", "client.server"]
+hiddenimports = collect_submodules("uvicorn") + ["anyio", "h11", "httpx", "httpcore", "certifi", "client.server"]
 try:
     hiddenimports += collect_submodules("webview")
     datas += collect_data_files("webview")
@@ -49,8 +52,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "RETI Studio",
         "CFBundleDisplayName": "RETI Studio",
-        "CFBundleShortVersionString": "1.2.3",
-        "CFBundleVersion": "1.2.3",
+        "CFBundleShortVersionString": "1.6.3",
+        "CFBundleVersion": "1.6.3",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "11.0",
     },

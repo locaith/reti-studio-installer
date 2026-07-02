@@ -24,10 +24,15 @@ datas = [
     (os.path.join(PROJECT, "client", "templates"), "templates"),
     (os.path.join(PROJECT, "client", "static"), "static"),
 ]
+# CA bundle for httpx/TLS. httpx 0.28 imports certifi lazily, so PyInstaller's
+# static analysis no longer auto-collects certifi/cacert.pem -> frozen app ends
+# up with an empty trust store ([X509: NO_CERTIFICATE_OR_CRL_FOUND]). Bundle it
+# explicitly; client_launcher._ensure_ca_bundle() points SSL_CERT_FILE at it.
+datas += collect_data_files("certifi")
 
 hiddenimports = []
 hiddenimports += collect_submodules("uvicorn")
-hiddenimports += ["anyio", "h11", "httpx", "httpcore", "client.server"]
+hiddenimports += ["anyio", "h11", "httpx", "httpcore", "certifi", "client.server"]
 try:
     hiddenimports += collect_submodules("webview")
     datas += collect_data_files("webview")
