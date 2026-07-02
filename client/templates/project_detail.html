@@ -340,5 +340,10 @@
     if(ok){showToast(`Đã nhập ${data.added} ảnh từ Drive.`);setTimeout(()=>location.reload(),800);}
     else{btn.disabled=false;btn.textContent=t;showToast('Lỗi: '+((data&&data.detail)||''));}
   }
+  // If a Drive link was entered when creating the project and no images imported yet,
+  // auto-list the folders so the user can pick right away.
+  if(document.getElementById('drive-link').value.trim() && {{ 'true' if p.image_count == 0 else 'false' }}){
+    document.getElementById('drive-sync').click();
+  }
 </script>
 {% endblock %}

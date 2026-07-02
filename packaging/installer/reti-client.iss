@@ -2,7 +2,7 @@
 ; Compile from project root (after building the client): ISCC packaging\installer\reti-client.iss
 
 #define MyAppName "RETI Studio"
-#define MyAppVersion "1.5.0"
+#define MyAppVersion "1.5.1"
 #define MyAppPublisher "RETI Home"
 #define MyAppURL "https://locaith.com"
 #define MyAppExeName "RETI Studio.exe"
