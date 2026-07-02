@@ -206,6 +206,16 @@
     </div>
   </div>
 
+  <!-- CAPCUT-STYLE SEGMENT EDITOR (for segmented TVCs) -->
+  <div id="capcut" hidden style="flex:0 0 auto;padding:0 16px 6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div><b style="font-size:14px">Chỉnh sửa timeline</b> <small style="color:#8b90a0;margin-left:6px">Kéo đổi thứ tự · sửa số giây · xoá đoạn</small></div>
+      <button class="btn-p" id="capcut-save" style="background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff;border:0;border-radius:20px;padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer">Lưu chỉnh sửa (0đ)</button>
+    </div>
+    <div id="capcut-list" style="display:flex;gap:10px;overflow-x:auto;padding:4px 2px 8px"></div>
+    <div id="capcut-msg" style="font-size:12px;color:#8b90a0;min-height:14px"></div>
+  </div>
+
   <!-- EDIT BAR -->
   <div class="editbar-wrap">
     <div class="editbar">
@@ -444,11 +454,55 @@ async function poll(){
     else if(sv.status==='failed'){if(!failed)showFailed(sv.error,sv.can_retry!==false);}
     else{failed=false;running=true;realP=Math.max(4,Math.min(97,Number(sv.progress||0)));
       const l=document.getElementById('ov-lab');if(l)l.textContent=stageLabel(sv.status,realP);ov.classList.remove('hidden');}
+    if(sv.tvc_segments && sv.tvc_segments.length && !capcutInit && sv.status==='completed'){ initCapcut(sv.tvc_segments); }
     lastCompleted=done;
   }catch(e){}
 }
 poll();setInterval(poll,2500);
 window.addEventListener('resize',()=>{if(player.duration)layoutTimeline(player.duration);});
+
+// ---- CapCut-style segment editor (segmented TVCs) ----
+let capcutInit=false, capcutState=[], dragIdx=null;
+function initCapcut(segs){
+  capcutInit=true;
+  capcutState=segs.map(s=>({position:s.position, kind:s.kind, headline:s.headline_caps||s.voiceover_vi||('Cảnh '+s.position), duration:Number(s.duration_seconds)||6}));
+  document.getElementById('capcut').hidden=false;
+  renderCapcut();
+}
+function renderCapcut(){
+  const list=document.getElementById('capcut-list'); list.innerHTML='';
+  capcutState.forEach((s,i)=>{
+    const c=document.createElement('div'); c.draggable=true; c.dataset.i=i;
+    c.style.cssText='flex:0 0 auto;width:150px;background:#15161d;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;cursor:grab';
+    const isPoster=s.kind==='poster_cta';
+    c.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:10.5px;font-weight:700;color:#ff8a5c">${isPoster?'POSTER':'CẢNH '+(i+1)}</span>
+        ${isPoster?'':'<button class="cc-del" title="Xoá" style="background:none;border:0;color:#8b90a0;cursor:pointer;font-size:16px;line-height:1">×</button>'}</div>
+      <div style="font-size:12px;color:#dfe2ea;line-height:1.4;height:48px;overflow:hidden">${(s.headline||'').replace(/</g,'&lt;').slice(0,60)}</div>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#8b90a0">Giây
+        <input type="number" min="2" max="10" step="1" value="${Math.round(s.duration)}" class="cc-dur" style="width:52px;background:#0e0f13;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:5px;color:#eef0f5"></label>`;
+    c.addEventListener('dragstart',()=>{dragIdx=i;c.style.opacity='.4';});
+    c.addEventListener('dragend',()=>{c.style.opacity='1';});
+    c.addEventListener('dragover',e=>e.preventDefault());
+    c.addEventListener('drop',e=>{e.preventDefault();if(dragIdx===null||dragIdx===i)return;const m=capcutState.splice(dragIdx,1)[0];capcutState.splice(i,0,m);dragIdx=null;renderCapcut();});
+    const del=c.querySelector('.cc-del'); if(del)del.onclick=()=>{capcutState.splice(i,1);renderCapcut();};
+    c.querySelector('.cc-dur').onchange=e=>{s.duration=Math.max(2,Math.min(10,Number(e.target.value)||6));};
+    list.appendChild(c);
+  });
+}
+document.getElementById('capcut-save').onclick=async()=>{
+  const msg=document.getElementById('capcut-msg'); const btn=document.getElementById('capcut-save');
+  if(!capcutState.length){msg.textContent='Giữ lại ít nhất một cảnh.';return;}
+  btn.disabled=true; msg.textContent='Đang ghép lại video…';
+  const items=capcutState.map(s=>({position:s.position, trim:s.duration}));
+  try{
+    const r=await fetch(`/video/${videoId}/reassemble`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok){msg.textContent='Đã cập nhật timeline.';showToast('Đã ghép lại video.');refreshPlayer();}
+    else msg.textContent='Lỗi: '+((d&&d.detail)||'thử lại');
+  }catch(e){msg.textContent='Lỗi kết nối.';}
+  finally{btn.disabled=false;}
+};
 </script>
 </body>
 </html>

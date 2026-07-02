@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.4.0"
+CLIENT_VERSION = "1.5.0"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 
@@ -349,6 +349,31 @@ async def project_add_topic(project_id: int, title: str = Form(...), angle: str 
 async def project_delete_topic(project_id: int, topic_id: int):
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.delete(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}", headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/drive/folders")
+async def project_drive_folders(project_id: int, link: str = Form(...)):
+    async with httpx.AsyncClient(timeout=45) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/folders",
+                              data={"link": link}, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/drive/import")
+async def project_drive_import(project_id: int, folder_id: str = Form(...)):
+    async with httpx.AsyncClient(timeout=300) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/import",
+                              data={"folder_id": folder_id}, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/video/{video_id}/reassemble")
+async def video_reassemble(video_id: int, request: Request):
+    body = await request.json()
+    async with httpx.AsyncClient(timeout=300) as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/videos/{video_id}/reassemble",
+                             json=body, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
 

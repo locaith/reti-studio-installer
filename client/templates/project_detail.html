@@ -87,6 +87,19 @@
     </div>
   </div>
 
+  <!-- Google Drive sync -->
+  <div class="card">
+    <h2>Đồng bộ ảnh từ Google Drive</h2>
+    <p class="sub">Dán link thư mục Drive (đã chia sẻ "Bất kỳ ai có link") → chọn folder dự án → AI tự lấy ảnh (khỏi tải tay).</p>
+    <div class="row" style="align-items:flex-end">
+      <label class="field" style="flex:1"><span>Link thư mục Google Drive</span>
+        <input id="drive-link" value="{{ p.drive_link or '' }}" placeholder="https://drive.google.com/drive/folders/...">
+      </label>
+      <button class="btn btn-g" id="drive-sync">Đồng bộ</button>
+    </div>
+    <div id="drive-folders" style="margin-top:12px"></div>
+  </div>
+
   <!-- Intake: documents + images -->
   <div class="card">
     <h2>Bổ sung hồ sơ & hình ảnh</h2>
@@ -121,7 +134,16 @@
 
   <!-- Content tree -->
   <div class="card">
-    <h2>Cây content ({{ p.topics|length }} chủ đề)</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <h2 style="margin:0">Cây content ({{ p.topics|length }} chủ đề)</h2>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#8b90a0">Độ dài TVC
+        <select id="tvc-len" style="background:#15161d;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:7px 10px;color:#eef0f5">
+          <option value="24">Ngắn ~24s</option>
+          <option value="36" selected>Vừa ~36s</option>
+          <option value="45">Dài ~45s</option>
+        </select>
+      </label>
+    </div>
     <p class="sub">Mỗi chủ đề sẽ thành một video bán hàng. Sửa/thêm/xoá theo ý.</p>
     <div id="topics">
       {% for t in p.topics %}
@@ -209,7 +231,8 @@
     let s=readScript(tid);
     if(!s||!s.segments){
       box.hidden=false;box.innerHTML='<div class="muted"><span class="mini-spin" style="display:inline-block;vertical-align:middle"></span> Đang viết kịch bản TVC…</div>';
-      const {ok,data}=await post(`/projects/${pid}/topics/${tid}/script`, {duration_seconds:28}, false);
+      const _len=(document.getElementById('tvc-len')||{}).value||'36';
+      const {ok,data}=await post(`/projects/${pid}/topics/${tid}/script`, {duration_seconds:_len}, false);
       if(!ok){box.innerHTML='<div class="muted">Lỗi tạo kịch bản: '+((data&&data.detail)||'')+'</div>';return;}
       s=data.script;document.getElementById('script-'+tid).textContent=JSON.stringify(s);
     }
@@ -291,5 +314,31 @@
   document.querySelectorAll('.open-script').forEach(b=>b.onclick=()=>openScript(b.closest('.topic').dataset.tid));
   const _open=new URLSearchParams(location.search).get('open');
   if(_open)openScript(_open);
+
+  // ---- Google Drive sync ----
+  const driveBox=document.getElementById('drive-folders');
+  document.getElementById('drive-sync').onclick=async()=>{
+    const link=document.getElementById('drive-link').value.trim();
+    if(!link){showToast('Dán link thư mục Drive.');return;}
+    driveBox.innerHTML='<div class="muted"><span class="mini-spin" style="display:inline-block;vertical-align:middle"></span> Đang đọc Drive…</div>';
+    const {ok,data}=await post(`/projects/${pid}/drive/folders`, {link}, false);
+    if(!ok){driveBox.innerHTML='<div class="muted" style="color:#ff8a8a">'+((data&&data.detail)||'Lỗi Drive')+'</div>';return;}
+    const folders=data.subfolders||[];
+    let html='';
+    if(folders.length){
+      html='<div class="muted" style="margin-bottom:8px">Chọn folder dự án để nhập ảnh:</div>';
+      folders.forEach(f=>{html+=`<button class="btn btn-g drive-pick" data-fid="${f.id}" style="margin:0 8px 8px 0">📁 ${(f.name||'').replace(/</g,'&lt;')}</button>`;});
+    }
+    if(data.has_images){html+=`<button class="btn btn-p drive-pick" data-fid="${data.root_folder_id}" style="margin:0 8px 8px 0">Nhập ảnh trong thư mục này →</button>`;}
+    if(!html)html='<div class="muted">Thư mục không có folder con hay ảnh nào.</div>';
+    driveBox.innerHTML=html;
+    driveBox.querySelectorAll('.drive-pick').forEach(b=>b.onclick=()=>driveImport(b.dataset.fid,b));
+  };
+  async function driveImport(fid,btn){
+    btn.disabled=true;const t=btn.textContent;btn.textContent='Đang nhập ảnh…';
+    const {ok,data}=await post(`/projects/${pid}/drive/import`, {folder_id:fid}, false);
+    if(ok){showToast(`Đã nhập ${data.added} ảnh từ Drive.`);setTimeout(()=>location.reload(),800);}
+    else{btn.disabled=false;btn.textContent=t;showToast('Lỗi: '+((data&&data.detail)||''));}
+  }
 </script>
 {% endblock %}

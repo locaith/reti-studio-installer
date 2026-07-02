@@ -50,23 +50,23 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.4.0.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.5.0.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.4.0.dmg
+          path: dist/RETI-Studio-1.5.0.dmg
 
-      - name: Publish to release v1.4.0
+      - name: Publish to release v1.5.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.4.0
-          name: RETI Studio 1.4.0
-          files: dist/RETI-Studio-1.4.0.dmg
+          tag_name: v1.5.0
+          name: RETI Studio 1.5.0
+          files: dist/RETI-Studio-1.5.0.dmg
           body: |
-            Bản 1.4.0 — Agent KỊCH BẢN TVC chuyên nghiệp: AI tự đọc dữ liệu dự án, viết kịch bản quảng cáo
-            chia PHÂN ĐOẠN (lời đọc voice nam ngắn gọn + chữ dẫn/tiêu đề thiết kế + máy quay + thời lượng),
-            hỗ trợ HYBRID (đánh dấu cảnh khó để gắn footage thật) và kết poster+CTA có từ khóa. Màn duyệt/sửa từng phân đoạn.
+            Bản 1.5.0 — TVC dài hơn & chuẩn agency (chuyển cảnh crossfade + chữ động + SFX + voice nam + phụ đề + poster/CTA).
+            Thêm: ĐỒNG BỘ GOOGLE DRIVE (dán link thư mục → chọn folder dự án → tự lấy ảnh), chọn ĐỘ DÀI kịch bản (24/36/45s),
+            và TIMELINE kiểu CapCut (kéo đổi thứ tự · sửa số giây · xoá đoạn → ghép lại KHÔNG tốn thêm token).
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`
