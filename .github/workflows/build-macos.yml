@@ -50,22 +50,22 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.1.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.2.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.6.1.dmg
+          path: dist/RETI-Studio-1.6.2.dmg
 
-      - name: Publish to release v1.6.1
+      - name: Publish to release v1.6.2
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.1
-          name: RETI Studio 1.6.1
-          files: dist/RETI-Studio-1.6.1.dmg
+          tag_name: v1.6.2
+          name: RETI Studio 1.6.2
+          files: dist/RETI-Studio-1.6.2.dmg
           body: |
-            Bản 1.6.1 — Bám ẢNH THẬT của dự án: AI đọc hiểu ảnh → ghép đúng ảnh vào đúng cảnh (video giống dự án hơn hẳn).
+            Bản 1.6.2 — Bám ẢNH THẬT của dự án: AI đọc hiểu ảnh → ghép đúng ảnh vào đúng cảnh (video giống dự án hơn hẳn).
             POSTER kết dày & đẹp (ảnh hero + điểm nổi bật + giá + CTA). Nhạc XUYÊN SUỐT (bỏ tiếng xẹt chuyển cảnh).
             Đồng bộ Drive có % tiến trình; dựng video hiện "đang dựng cảnh mấy"; timeline gọn: nút Chỉnh sửa + sửa/xoá/đổi thứ tự.
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc

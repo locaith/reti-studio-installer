@@ -35,9 +35,13 @@
   .ratio-badge{position:absolute;left:6px;top:12px;color:var(--sub);font-size:12px;display:flex;flex-direction:column;align-items:center;gap:4px}
   .ratio-badge .box{width:22px;height:16px;border:1.6px solid var(--sub);border-radius:3px}
   .player-box{position:relative;background:#000;border-radius:10px;overflow:hidden;max-height:100%;max-width:100%;display:flex;align-items:center;justify-content:center}
-  .player-box video{display:block;max-height:62vh;max-width:100%;background:#000}
-  .player-box.r169 video{aspect-ratio:16/9;width:min(58vw,calc(62vh*16/9))}
-  .player-box.r916 video{aspect-ratio:9/16;height:62vh}
+  .player-box video{display:block;max-height:74vh;max-width:100%;background:#000}
+  .player-box.r169 video{aspect-ratio:16/9;width:min(70vw,calc(74vh*16/9))}
+  .player-box.r916 video{aspect-ratio:9/16;height:74vh}
+  /* When the player is fullscreen, the video must fill the whole screen. */
+  .player-box:fullscreen{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
+  .player-box:fullscreen video{max-height:100vh;max-width:100vw;width:auto;height:100vh}
+  .player-box.r169:fullscreen video{width:min(100vw,calc(100vh*16/9));height:auto}
   .transport{display:flex;align-items:center;gap:16px;margin-top:14px;color:var(--txt);font-variant-numeric:tabular-nums}
   .transport .t{font-size:12.5px;color:var(--sub);min-width:64px;text-align:center}
   .transport .play{width:44px;height:44px;border-radius:50%;background:#fff;color:#111;display:flex;align-items:center;justify-content:center}
