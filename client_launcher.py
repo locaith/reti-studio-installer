@@ -95,14 +95,50 @@ def _wait_for_http(url: str, timeout: float = 30.0) -> bool:
     return False
 
 
+def _is_up(url: str) -> bool:
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=1.5) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+def _setup_webview_env() -> None:
+    """Give WebView2 a dedicated, writable per-user data folder.
+
+    Without this, pywebview lets WebView2 pick a default cache folder that can be
+    locked (by a just-closed instance) or shared with other apps, which makes
+    ``webview.start()`` throw -> the app falls back to opening in a web BROWSER
+    instead of its native window. A fixed per-user folder makes the native window
+    reliable across reopen/relaunch.
+    """
+    try:
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        udf = os.path.join(base, "RETI Studio", "WebView2")
+        os.makedirs(udf, exist_ok=True)
+        os.environ.setdefault("WEBVIEW2_USER_DATA_FOLDER", udf)
+    except Exception:
+        pass
+
+
 def main() -> int:
     _ensure_streams()
+    _setup_webview_env()
     host, port = "127.0.0.1", 17650
     url = f"http://{host}:{port}/"
 
-    server = _make_server(host, port)
-    threading.Thread(target=server.run, daemon=True).start()
-    ready = _wait_for_http(url + "health")
+    # Single instance: if one is already serving, don't start a second server —
+    # a port clash would kill this instance's server thread and can break its
+    # webview (the cause of the "opens in a browser" symptom). Just point the
+    # window at the running instance instead.
+    if _is_up(url + "health"):
+        ready = True
+    else:
+        server = _make_server(host, port)
+        threading.Thread(target=server.run, daemon=True).start()
+        ready = _wait_for_http(url + "health")
 
     if "--selftest" in sys.argv:
         print(f"CLIENT SELFTEST: {'OK' if ready else 'FAIL'} {url}")
@@ -112,7 +148,13 @@ def main() -> int:
         import webview
 
         webview.create_window("RETI Studio", url, width=1360, height=900, min_size=(1024, 680))
-        webview.start()
+        try:
+            webview.start(gui="edgechromium")
+        except Exception as start_exc:
+            # Fresh window + default backend as a second try before giving up.
+            print(f"edgechromium start failed ({start_exc}); retrying default backend.", file=sys.stderr)
+            webview.create_window("RETI Studio", url, width=1360, height=900, min_size=(1024, 680))
+            webview.start()
     except Exception as exc:
         import webbrowser
 

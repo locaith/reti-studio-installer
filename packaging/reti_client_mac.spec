@@ -52,8 +52,8 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": "RETI Studio",
         "CFBundleDisplayName": "RETI Studio",
-        "CFBundleShortVersionString": "1.6.3",
-        "CFBundleVersion": "1.6.3",
+        "CFBundleShortVersionString": "1.6.4",
+        "CFBundleVersion": "1.6.4",
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "11.0",
     },
