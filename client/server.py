@@ -13,14 +13,40 @@ from pathlib import Path
 from urllib.parse import quote
 
 import httpx
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.6.6"
+CLIENT_VERSION = "1.6.7"
 GITHUB_REPO = "locaith/reti-studio-installer"
+
+# ---- shared HTTP pool ------------------------------------------------------
+# One keep-alive connection pool for ALL proxy calls. The old per-request
+# `httpx.AsyncClient()` did a fresh TCP+TLS handshake to the cloud on every
+# click/poll (~200-500ms each) — the main reason the app felt laggy.
+_HTTP: httpx.AsyncClient | None = None
+
+
+def _pool() -> httpx.AsyncClient:
+    global _HTTP
+    if _HTTP is None or _HTTP.is_closed:
+        _HTTP = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=8.0, read=600.0, write=600.0, pool=10.0),
+            follow_redirects=True,
+            limits=httpx.Limits(max_keepalive_connections=6, max_connections=12,
+                                keepalive_expiry=75.0),
+        )
+    return _HTTP
+
+
+@asynccontextmanager
+async def _pooled():
+    yield _pool()  # shared client: do NOT close it per request
+
+
 
 
 def _parse_ver(value: str) -> tuple[int, ...]:
@@ -126,7 +152,7 @@ async def update_check():
     """Ask GitHub for the latest release; report if a newer installer exists."""
     result: dict[str, object] = {"available": False, "current": CLIENT_VERSION}
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with _pooled() as client:
             r = await client.get(
                 f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
                 headers={"Accept": "application/vnd.github+json"},
@@ -153,7 +179,7 @@ async def do_update(url: str = Form(...)):
     import tempfile
 
     try:
-        async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+        async with _pooled() as client:
             r = await client.get(url)
         if r.status_code != 200:
             raise HTTPException(status_code=502, detail="Tải bản cập nhật thất bại.")
@@ -178,7 +204,7 @@ async def home(request: Request, error: str = ""):
     if not token:
         return templates.TemplateResponse(request, "setup.html", {"cloud": CLOUD_URL, "error": None})
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with _pooled() as client:
             me_resp = await client.get(f"{CLOUD_URL}/api/v1/me", headers=_headers())
             if me_resp.status_code in (401, 403):
                 return templates.TemplateResponse(
@@ -199,7 +225,7 @@ async def home(request: Request, error: str = ""):
 async def setup(request: Request, token: str = Form(...)):
     token = token.strip()
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with _pooled() as client:
             resp = await client.get(f"{CLOUD_URL}/api/v1/me", headers={"Authorization": f"Bearer {token}"})
     except Exception as exc:
         return templates.TemplateResponse(request, "setup.html", {"cloud": CLOUD_URL, "error": f"Không kết nối được máy chủ ({exc})."})
@@ -248,7 +274,7 @@ async def settings_save(request: Request, storage_dir: str = Form(""), auto_save
 async def save_video(video_id: int, quality: str = "original", title: str = Form("")):
     """Download the finished video from the cloud and save it onto THIS machine
     (the customer's own disk), in the configured storage folder."""
-    async with httpx.AsyncClient(timeout=600) as client:
+    async with _pooled() as client:
         resp = await client.get(
             f"{CLOUD_URL}/api/v1/videos/{video_id}/download",
             params={"quality": quality}, headers=_headers(),
@@ -283,7 +309,7 @@ def open_folder():
 @app.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request, error: str = ""):
     try:
-        async with httpx.AsyncClient(timeout=25) as client:
+        async with _pooled() as client:
             r = await client.get(f"{CLOUD_URL}/api/v1/projects", headers=_headers())
         projects = r.json().get("projects", []) if r.status_code == 200 else []
     except Exception as exc:
@@ -296,7 +322,7 @@ async def projects_page(request: Request, error: str = ""):
 async def projects_create(request: Request):
     form = await request.form()
     data = {k: str(v) for k, v in form.items()}
-    async with httpx.AsyncClient(timeout=40) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects", data=data, headers=_headers())
     if r.status_code == 200:
         return RedirectResponse(f"/projects/{r.json().get('id')}", status_code=303)
@@ -306,7 +332,7 @@ async def projects_create(request: Request):
 
 @app.get("/projects/{project_id}", response_class=HTMLResponse)
 async def project_detail(request: Request, project_id: int):
-    async with httpx.AsyncClient(timeout=25) as client:
+    async with _pooled() as client:
         r = await client.get(f"{CLOUD_URL}/api/v1/projects/{project_id}", headers=_headers())
     if r.status_code != 200:
         raise HTTPException(status_code=404, detail="Không tìm thấy dự án.")
@@ -316,7 +342,7 @@ async def project_detail(request: Request, project_id: int):
 @app.post("/projects/{project_id}/documents")
 async def project_documents(project_id: int, request: Request, text: str = Form(""), files: list[UploadFile] = File(default=[])):
     up = [("files", (f.filename, await f.read(), f.content_type or "application/octet-stream")) for f in files if f and f.filename]
-    async with httpx.AsyncClient(timeout=90) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/documents",
                               data={"text": text}, files=up or None, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -325,21 +351,21 @@ async def project_documents(project_id: int, request: Request, text: str = Form(
 @app.post("/projects/{project_id}/images")
 async def project_images(project_id: int, images: list[UploadFile] = File(default=[])):
     up = [("images", (f.filename, await f.read(), f.content_type or "image/jpeg")) for f in images if f and f.filename]
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/images", files=up or None, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
 
 @app.post("/projects/{project_id}/analyze")
 async def project_analyze(project_id: int):
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/analyze", headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
 
 @app.post("/projects/{project_id}/topics")
 async def project_add_topic(project_id: int, title: str = Form(...), angle: str = Form("")):
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics",
                               data={"title": title, "angle": angle}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -347,14 +373,14 @@ async def project_add_topic(project_id: int, title: str = Form(...), angle: str 
 
 @app.post("/projects/{project_id}/topics/{topic_id}/delete")
 async def project_delete_topic(project_id: int, topic_id: int):
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with _pooled() as client:
         r = await client.delete(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}", headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
 
 @app.post("/projects/{project_id}/drive/folders")
 async def project_drive_folders(project_id: int, link: str = Form(...)):
-    async with httpx.AsyncClient(timeout=45) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/folders",
                               data={"link": link}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -362,7 +388,7 @@ async def project_drive_folders(project_id: int, link: str = Form(...)):
 
 @app.post("/projects/{project_id}/drive/import")
 async def project_drive_import(project_id: int, folder_id: str = Form(...)):
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/import",
                               data={"folder_id": folder_id}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -370,7 +396,7 @@ async def project_drive_import(project_id: int, folder_id: str = Form(...)):
 
 @app.post("/projects/{project_id}/drive/list-images")
 async def project_drive_list_images(project_id: int, folder_id: str = Form(...)):
-    async with httpx.AsyncClient(timeout=45) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/list-images",
                               data={"folder_id": folder_id}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -378,7 +404,7 @@ async def project_drive_list_images(project_id: int, folder_id: str = Form(...))
 
 @app.post("/projects/{project_id}/drive/import-one")
 async def project_drive_import_one(project_id: int, file_id: str = Form(...), name: str = Form("image.jpg")):
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/import-one",
                               data={"file_id": file_id, "name": name}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -387,7 +413,7 @@ async def project_drive_import_one(project_id: int, file_id: str = Form(...), na
 @app.post("/video/{video_id}/reassemble")
 async def video_reassemble(video_id: int, request: Request):
     body = await request.json()
-    async with httpx.AsyncClient(timeout=300) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/videos/{video_id}/reassemble",
                              json=body, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -395,7 +421,7 @@ async def video_reassemble(video_id: int, request: Request):
 
 @app.post("/projects/{project_id}/topics/{topic_id}/script")
 async def project_gen_script(project_id: int, topic_id: int, duration_seconds: int = Form(24)):
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/script",
                               data={"duration_seconds": str(duration_seconds)}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -404,7 +430,7 @@ async def project_gen_script(project_id: int, topic_id: int, duration_seconds: i
 @app.post("/projects/{project_id}/topics/{topic_id}/script/save")
 async def project_save_script(project_id: int, topic_id: int, request: Request):
     body = await request.json()
-    async with httpx.AsyncClient(timeout=40) as client:
+    async with _pooled() as client:
         r = await client.put(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/script",
                              json=body, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -412,7 +438,7 @@ async def project_save_script(project_id: int, topic_id: int, request: Request):
 
 @app.post("/projects/{project_id}/topics/{topic_id}/produce")
 async def project_produce(project_id: int, topic_id: int, aspect_ratio: str = Form("16:9"), quality: str = Form("standard")):
-    async with httpx.AsyncClient(timeout=90) as client:
+    async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/produce",
                               data={"aspect_ratio": aspect_ratio, "quality": quality}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -420,7 +446,7 @@ async def project_produce(project_id: int, topic_id: int, aspect_ratio: str = Fo
 
 @app.post("/projects/{project_id}/delete")
 async def project_delete(project_id: int):
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with _pooled() as client:
         await client.delete(f"{CLOUD_URL}/api/v1/projects/{project_id}", headers=_headers())
     return RedirectResponse("/projects", status_code=303)
 
@@ -433,7 +459,7 @@ async def enhance(
     video_style: str = Form("cinematic"),
 ):
     try:
-        async with httpx.AsyncClient(timeout=40) as client:
+        async with _pooled() as client:
             r = await client.post(
                 f"{CLOUD_URL}/api/v1/enhance",
                 json={"prompt": prompt, "duration_seconds": duration_seconds,
@@ -470,7 +496,7 @@ async def create(
     if logo is not None and logo.filename:
         files.append(("logo", (logo.filename, await logo.read(), logo.content_type or "image/png")))
     try:
-        async with httpx.AsyncClient(timeout=180) as client:
+        async with _pooled() as client:
             resp = await client.post(f"{CLOUD_URL}/api/v1/videos", data=data, files=files or None, headers=_headers())
     except Exception as exc:
         return RedirectResponse(f"/?error={quote(f'Lỗi kết nối: {exc}')}", status_code=303)
@@ -482,7 +508,7 @@ async def create(
 
 @app.get("/video/{video_id}", response_class=HTMLResponse)
 async def video_page(request: Request, video_id: int):
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with _pooled() as client:
         resp = await client.get(f"{CLOUD_URL}/api/v1/videos/{video_id}", headers=_headers())
     if resp.status_code != 200:
         raise HTTPException(status_code=404, detail="Không tìm thấy video.")
@@ -494,7 +520,7 @@ async def video_page(request: Request, video_id: int):
 
 @app.get("/api/video/{video_id}")
 async def video_status(video_id: int):
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with _pooled() as client:
         resp = await client.get(f"{CLOUD_URL}/api/v1/videos/{video_id}", headers=_headers())
     return JSONResponse(resp.json(), status_code=resp.status_code)
 
@@ -502,7 +528,7 @@ async def video_status(video_id: int):
 @app.get("/api/video/{video_id}/clips")
 async def video_clips(video_id: int):
     """Timeline: list all clips of this video (base + extensions)."""
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with _pooled() as client:
         resp = await client.get(f"{CLOUD_URL}/api/v1/videos/{video_id}/clips", headers=_headers())
     return JSONResponse(resp.json(), status_code=resp.status_code)
 
@@ -510,7 +536,7 @@ async def video_clips(video_id: int):
 @app.post("/video/{video_id}/extend")
 async def video_extend(video_id: int, prompt: str = Form("")):
     """Timeline: add one more Veo clip continuing from the last frame."""
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with _pooled() as client:
         resp = await client.post(
             f"{CLOUD_URL}/api/v1/videos/{video_id}/extend",
             data={"prompt": prompt}, headers=_headers(),
@@ -520,14 +546,14 @@ async def video_extend(video_id: int, prompt: str = Form("")):
 
 @app.post("/video/{video_id}/retry")
 async def video_retry(video_id: int):
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with _pooled() as client:
         resp = await client.post(f"{CLOUD_URL}/api/v1/videos/{video_id}/retry", headers=_headers())
     return JSONResponse(resp.json(), status_code=resp.status_code)
 
 
 @app.get("/clip/{job_id}/download")
 async def clip_download(job_id: int):
-    async with httpx.AsyncClient(timeout=180) as client:
+    async with _pooled() as client:
         resp = await client.get(f"{CLOUD_URL}/api/v1/clips/{job_id}/download", headers=_headers())
     if resp.status_code != 200:
         raise HTTPException(status_code=404, detail="Clip chưa sẵn sàng.")
@@ -536,7 +562,7 @@ async def clip_download(job_id: int):
 
 @app.get("/video/{video_id}/download")
 async def video_download(video_id: int, quality: str = "original"):
-    async with httpx.AsyncClient(timeout=600) as client:
+    async with _pooled() as client:
         resp = await client.get(
             f"{CLOUD_URL}/api/v1/videos/{video_id}/download",
             params={"quality": quality}, headers=_headers(),
@@ -544,3 +570,36 @@ async def video_download(video_id: int, quality: str = "original"):
     if resp.status_code != 200:
         raise HTTPException(status_code=404, detail="Video chưa sẵn sàng.")
     return Response(content=resp.content, media_type="video/mp4")
+
+
+def _media_cache_dir() -> Path:
+    d = _app_data_dir() / "cache"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _trim_media_cache(keep: int = 15) -> None:
+    try:
+        files = sorted(_media_cache_dir().glob("video-*.mp4"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for f in files[keep:]:
+            f.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+@app.get("/media/{video_id}")
+async def media_stream(video_id: int, refresh: int = 0):
+    """Player source: download the finished video ONCE into a local disk cache and
+    serve it from there with HTTP Range support (FileResponse) — replays and seeks
+    are instant instead of re-streaming the whole file from the cloud every time."""
+    f = _media_cache_dir() / f"video-{video_id}.mp4"
+    if refresh or not f.exists() or f.stat().st_size == 0:
+        async with _pooled() as client:
+            resp = await client.get(f"{CLOUD_URL}/api/v1/videos/{video_id}/download", headers=_headers())
+        if resp.status_code != 200:
+            raise HTTPException(status_code=404, detail="Video chưa sẵn sàng.")
+        tmp = f.with_suffix(".part")
+        tmp.write_bytes(resp.content)
+        tmp.replace(f)
+        _trim_media_cache()
+    return FileResponse(str(f), media_type="video/mp4")

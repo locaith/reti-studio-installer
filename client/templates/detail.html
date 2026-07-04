@@ -104,6 +104,16 @@
   .add-scene .plus{width:22px;height:22px;border-radius:50%;background:rgba(255,70,87,.16);color:#ff6474;display:flex;align-items:center;justify-content:center;font-size:14px}
   .playhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 6px rgba(255,255,255,.6);pointer-events:none;z-index:5}
   .playhead::before{content:"";position:absolute;top:-2px;left:-5px;width:12px;height:12px;border-radius:50%;background:#fff}
+  /* CapCut-style inline edit ON the filmstrip */
+  .film{gap:2px}
+  .film .seg.editing{cursor:grab;border-color:rgba(255,255,255,.28)}
+  .film .seg.editing:active{cursor:grabbing}
+  .film .seg.dragover{border-color:#ff7a3d}
+  .film .seg .segdel{position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.72);color:#ff8a93;border:0;cursor:pointer;font-size:11px;line-height:1;z-index:4;display:flex;align-items:center;justify-content:center;padding:0}
+  .film .seg .segdel:hover{background:#ff4657;color:#fff}
+  .film .seg .trim{position:absolute;right:0;top:0;bottom:0;width:9px;cursor:ew-resize;z-index:4;background:linear-gradient(90deg,transparent,rgba(255,122,61,.75));border-radius:0 6px 6px 0;opacity:.55}
+  .film .seg .trim:hover,.film .seg .trim.on{opacity:1}
+  .film .seg .durlab{position:absolute;right:4px;bottom:3px;background:rgba(0,0,0,.66);border-radius:9px;padding:1px 6px;font-size:9px;font-weight:700;color:#ffd9a8;z-index:3}
 
   /* Edit bar */
   .editbar-wrap{flex:0 0 auto;display:flex;justify-content:center;padding:6px 16px 14px}
@@ -172,7 +182,7 @@
     <div class="stage">
       <div class="ratio-badge"><span class="box"></span><span id="ratio-txt">{{ v.aspect_ratio }}</span></div>
       <div class="player-box" id="pbox">
-        <video id="player" playsinline preload="metadata" {% if v.status == 'completed' %}src="/video/{{ v.id }}/download"{% endif %}></video>
+        <video id="player" playsinline preload="metadata" {% if v.status == 'completed' %}src="/media/{{ v.id }}"{% endif %}></video>
         <div class="ov{% if v.status == 'completed' %} hidden{% endif %}" id="ov">
           <div class="big-spin"></div>
           <div class="pct" id="ov-pct">{{ v.progress or 4 }}%</div>
@@ -204,6 +214,9 @@
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
         <span id="edit-toggle-lab">Chỉnh sửa</span>
       </button>
+      <span id="tl-hint" hidden style="align-self:center;margin-right:auto;font-size:11.5px;color:#8b90a0">Kéo mép phải để cắt · kéo cả khối để đổi chỗ · × để xoá</span>
+      <button class="pill" id="tl-save" hidden style="display:none;align-items:center;gap:5px;padding:6px 14px;border-radius:18px;background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff;border:0;cursor:pointer;font-size:12.5px;font-weight:600">Lưu (0đ)</button>
+      <button class="pill" id="tl-cancel" hidden style="display:none;align-items:center;padding:6px 12px;border-radius:18px;background:rgba(255,255,255,.08);color:#dfe2ea;border:0;cursor:pointer;font-size:12.5px">Hủy</button>
       <button class="zoom-btn" id="zoom-out"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
       <button class="zoom-btn" id="zoom-in"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>
@@ -214,16 +227,6 @@
         <div class="playhead hidden" id="playhead" style="left:0"></div>
       </div>
     </div>
-  </div>
-
-  <!-- CAPCUT-STYLE SEGMENT EDITOR (for segmented TVCs) -->
-  <div id="capcut" hidden style="flex:0 0 auto;padding:0 16px 6px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div><b style="font-size:14px">Chỉnh sửa timeline</b> <small style="color:#8b90a0;margin-left:6px">Kéo đổi thứ tự · sửa số giây · xoá đoạn</small></div>
-      <button class="btn-p" id="capcut-save" style="background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff;border:0;border-radius:20px;padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer">Lưu chỉnh sửa (0đ)</button>
-    </div>
-    <div id="capcut-list" style="display:flex;gap:10px;overflow-x:auto;padding:4px 2px 8px"></div>
-    <div id="capcut-msg" style="font-size:12px;color:#8b90a0;min-height:14px"></div>
   </div>
 
   <!-- EDIT BAR -->
@@ -287,7 +290,7 @@ player.addEventListener('loadedmetadata',()=>{totEl.textContent=fmt(player.durat
 /* ---- timeline (filmstrip) ---- */
 const filmEl=document.getElementById('film'), rulerEl=document.getElementById('ruler'),
       innerEl=document.getElementById('tl-inner'), playhead=document.getElementById('playhead');
-const FRAME_W=118, SECS_PER_FRAME=1.4;
+const FRAME_W=118, SECS_PER_FRAME=2.5;
 
 async function extractFrames(dur){
   const key=player.currentSrc+'|'+dur.toFixed(2);
@@ -296,22 +299,22 @@ async function extractFrames(dur){
   const src=document.createElement('video');
   src.src=player.currentSrc; src.muted=true; src.preload='auto';
   await new Promise(r=>{src.onloadeddata=r;src.onerror=r;});
-  const cv=document.createElement('canvas'); const vw=src.videoWidth||640, vh=src.videoHeight||360;
-  cv.width=vw; cv.height=vh; const ctx=cv.getContext('2d');
+  // downscaled thumbnails: encoding 28 full-res 1080x1920 JPEGs froze the UI
+  const vw0=src.videoWidth||640, vh0=src.videoHeight||360;
+  const vh=80, vw=Math.max(24,Math.round(vw0/vh0*vh));
+  const cv=document.createElement('canvas'); cv.width=vw; cv.height=vh;
+  const ctx=cv.getContext('2d');
   for(let i=0;i<n;i++){
     const t=Math.min(dur-0.05,(i+0.5)*dur/n);
     await new Promise(res=>{const on=()=>{src.removeEventListener('seeked',on);res()};src.addEventListener('seeked',on);try{src.currentTime=t}catch(e){res()}});
-    try{ctx.drawImage(src,0,0,vw,vh);frames.push({t,url:cv.toDataURL('image/jpeg',0.7)});}catch(e){frames.push({t,url:''});}
+    try{ctx.drawImage(src,0,0,vw,vh);frames.push({t,url:cv.toDataURL('image/jpeg',0.55)});}catch(e){frames.push({t,url:''});}
   }
   try{src.src='';}catch(e){}
 }
 
 function layoutTimeline(dur){
   const containerW=document.getElementById('tl-scroll').clientWidth||1000;
-  // Strip width scales with duration & zoom, but always fills most of the bar so
-  // short clips don't leave a black gap. Frames stretch to fill exactly (matches ruler).
-  const stripW=Math.round(Math.max(frames.length*FRAME_W*zoom, (containerW-90)*(zoom>1?zoom:1)));
-  const perFrame=stripW/Math.max(frames.length,1);
+  const stripW=Math.round(Math.max(frames.length*FRAME_W*zoom, (containerW-70)*(zoom>1?zoom:1)));
   // ruler
   rulerEl.style.width=stripW+'px';
   rulerEl.innerHTML='';
@@ -321,22 +324,73 @@ function layoutTimeline(dur){
   for(let s=0;s<=total;s+=step){
     const d=document.createElement('div');d.className='tick';d.style.left=Math.min(s*pxPerSec,stripW-2)+'px';d.textContent=pad(s);rulerEl.appendChild(d);
   }
-  // filmstrip: one active segment, frames stretched to fill the whole strip
   filmEl.style.width=stripW+'px';
   filmEl.innerHTML='';
+  if(segState.length)buildSegBlocks(stripW,dur); else buildSingleBlock(stripW,dur);
+  // add-scene button
+  const add=document.createElement('button');add.className='add-scene';add.title='Kéo dài video';
+  add.innerHTML='<span class="plus">+</span>';
+  add.onclick=focusEdit;
+  filmEl.appendChild(add);
+  innerEl.style.width=(stripW+66)+'px';
+  movePlayhead();
+}
+function buildSingleBlock(stripW,dur){
+  const perFrame=stripW/Math.max(frames.length,1);
   const seg=document.createElement('div');seg.className='seg active';seg.style.width=stripW+'px';
   frames.forEach(f=>{const im=document.createElement('img');im.src=f.url;im.style.width=perFrame+'px';im.style.flex='0 0 auto';seg.appendChild(im);});
   const lab=document.createElement('span');lab.className='seglab';lab.textContent='Cảnh';seg.appendChild(lab);
   filmEl.appendChild(seg);
-  // add-scene button
-  const add=document.createElement('button');add.className='add-scene';
-  add.innerHTML='<span class="plus"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Kéo dài';
-  add.onclick=focusEdit;
-  filmEl.appendChild(add);
-  innerEl.style.width=(stripW+90)+'px';
-  // seek by click on strip
   seg.onclick=(e)=>{const rect=seg.getBoundingClientRect();const x=e.clientX-rect.left;player.currentTime=Math.max(0,Math.min(dur,(x/stripW)*dur));};
-  movePlayhead();
+}
+/* CapCut-style: each scene is a block ON the strip — trim by dragging its right
+   edge, drag the block to reorder, × to delete. No extra panel. */
+function buildSegBlocks(stripW,dur){
+  const totalSecs=segState.reduce((a,s)=>a+s.duration,0)||1;
+  let cum=0;
+  segState.forEach((s,i)=>{
+    const w=Math.max(34,Math.round(stripW*s.duration/totalSecs));
+    const seg=document.createElement('div');seg.className='seg'+(editing?' editing':'');seg.style.width=w+'px';
+    const isPoster=s.kind==='poster_cta';
+    let th=frames.filter(f=>f.t>=s.origStart-0.01&&f.t<s.origStart+s.origDur-0.01);
+    if(!th.length&&frames.length)th=[frames[Math.min(frames.length-1,Math.floor((s.origStart+s.origDur/2)/Math.max(dur,1)*frames.length))]];
+    th.forEach(f=>{const im=document.createElement('img');im.src=f.url;im.style.cssText='flex:1 1 0;min-width:0;object-fit:cover';seg.appendChild(im);});
+    const lab=document.createElement('span');lab.className='seglab';lab.textContent=isPoster?'POSTER':('C'+(i+1));seg.appendChild(lab);
+    const dl=document.createElement('span');dl.className='durlab';dl.textContent=s.duration+'s';seg.appendChild(dl);
+    const segStart=cum;
+    if(!editing){
+      seg.onclick=(e)=>{const rect=seg.getBoundingClientRect();const frac=(e.clientX-rect.left)/Math.max(rect.width,1);
+        player.currentTime=Math.max(0,Math.min(dur,((segStart+frac*s.duration)/totalSecs)*dur));};
+    }else{
+      if(!isPoster){
+        const del=document.createElement('button');del.className='segdel';del.textContent='×';del.title='Xoá cảnh';
+        del.onclick=(e)=>{e.stopPropagation();segState.splice(i,1);layoutTimeline(dur);};
+        seg.appendChild(del);
+        seg.draggable=true;
+        seg.addEventListener('dragstart',()=>{dragIdx=i;seg.style.opacity='.35';});
+        seg.addEventListener('dragend',()=>{seg.style.opacity='1';filmEl.querySelectorAll('.seg').forEach(x=>x.classList.remove('dragover'));});
+      }
+      seg.addEventListener('dragover',e=>{e.preventDefault();seg.classList.add('dragover');});
+      seg.addEventListener('dragleave',()=>seg.classList.remove('dragover'));
+      seg.addEventListener('drop',e=>{e.preventDefault();seg.classList.remove('dragover');
+        if(dragIdx===null||dragIdx===i)return;const m=segState.splice(dragIdx,1)[0];segState.splice(i,0,m);dragIdx=null;layoutTimeline(dur);});
+      if(!isPoster){
+        const trim=document.createElement('div');trim.className='trim';trim.title='Kéo để cắt bớt/thêm giây';
+        trim.addEventListener('pointerdown',(e)=>{
+          e.stopPropagation();e.preventDefault();seg.draggable=false;trim.classList.add('on');
+          const x0=e.clientX,d0=s.duration,pps=stripW/totalSecs;
+          const move=(ev)=>{let v=d0+(ev.clientX-x0)/pps;v=Math.round(v*2)/2;v=Math.max(2,Math.min(Math.max(s.origDur,2),v));
+            if(v!==s.duration){s.duration=v;dl.textContent=v+'s';seg.style.width=Math.max(34,Math.round(stripW*v/totalSecs))+'px';}};
+          const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);
+            seg.draggable=true;trim.classList.remove('on');layoutTimeline(dur);};
+          window.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
+        });
+        seg.appendChild(trim);
+      }
+    }
+    filmEl.appendChild(seg);
+    cum+=s.duration;
+  });
 }
 function movePlayhead(){
   const dur=player.duration; if(!dur||!isFinite(dur)){playhead.classList.add('hidden');return;}
@@ -452,7 +506,7 @@ const AUTO_SAVE=root.dataset.autosave==='on';
 function maybeAutoSave(){if(AUTO_SAVE&&!autoSaved){autoSaved=true;saveVideo('original');}}
 
 /* ---- refresh player after new clip ---- */
-function refreshPlayer(){const t=player.currentTime||0;player.src=`/video/${videoId}/download?_=${Date.now()}`;player.load();ov.classList.add('hidden');ov.classList.remove('fail');builtFor='';}
+function refreshPlayer(){player.src=`/media/${videoId}?refresh=1&_=${Date.now()}`;player.load();ov.classList.add('hidden');ov.classList.remove('fail');builtFor='';}
 
 /* ---- poll ---- */
 async function poll(){
@@ -467,58 +521,51 @@ async function poll(){
     else if(sv.status==='failed'){if(!failed)showFailed(sv.error,sv.can_retry!==false);}
     else{failed=false;running=true;realP=Math.max(4,Math.min(97,Number(sv.progress||0)));
       const l=document.getElementById('ov-lab');if(l)l.textContent=sv.step||stageLabel(sv.status,realP);ov.classList.remove('hidden');}
-    if(sv.tvc_segments && sv.tvc_segments.length && !capcutInit && sv.status==='completed'){ initCapcut(sv.tvc_segments); }
+    if(sv.tvc_segments && sv.tvc_segments.length && !segsInit && sv.status==='completed'){ initSegments(sv.tvc_segments); }
     lastCompleted=done;
   }catch(e){}
 }
-poll();setInterval(poll,2500);
+poll();setInterval(()=>{if(!document.hidden)poll();},2500);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});
 window.addEventListener('resize',()=>{if(player.duration)layoutTimeline(player.duration);});
 
-// ---- CapCut-style segment editor (segmented TVCs) ----
-let capcutInit=false, capcutState=[], dragIdx=null;
-function initCapcut(segs){
-  capcutInit=true;
-  capcutState=segs.map(s=>({position:s.position, kind:s.kind, headline:s.headline_caps||s.voiceover_vi||('Cảnh '+s.position), duration:Number(s.duration_seconds)||6}));
+// ---- CapCut-style INLINE segment editing (right on the filmstrip) ----
+let segsInit=false, segState=[], origState=[], editing=false, dragIdx=null;
+function initSegments(segs){
+  segsInit=true;
+  let acc=0;
+  segState=segs.map(s=>{const d=Number(s.duration_seconds)||6;
+    const o={position:s.position,kind:s.kind,duration:d,origDur:d,origStart:acc};acc+=d;return o;});
+  origState=JSON.parse(JSON.stringify(segState));
   const et=document.getElementById('edit-toggle');
-  if(et){ et.hidden=false; et.style.display='inline-flex';
-    et.onclick=()=>{ const box=document.getElementById('capcut'); const show=box.hidden; box.hidden=!show;
-      document.getElementById('edit-toggle-lab').textContent=show?'Đóng chỉnh sửa':'Chỉnh sửa';
-      if(show)renderCapcut(); };
-  }
-  renderCapcut();  // populate (kept hidden until toggled)
+  et.hidden=false;et.style.display='inline-flex';
+  et.onclick=()=>setEditing(!editing);
+  if(player.duration&&isFinite(player.duration))layoutTimeline(player.duration);
 }
-function renderCapcut(){
-  const list=document.getElementById('capcut-list'); list.innerHTML='';
-  capcutState.forEach((s,i)=>{
-    const c=document.createElement('div'); c.draggable=true; c.dataset.i=i;
-    c.style.cssText='flex:0 0 auto;width:124px;background:#15161d;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:8px;cursor:grab';
-    const isPoster=s.kind==='poster_cta';
-    c.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span style="font-size:10px;font-weight:700;color:#ff8a5c">${isPoster?'POSTER':'CẢNH '+(i+1)}</span>
-        ${isPoster?'':'<button class="cc-del" title="Xoá" style="background:none;border:0;color:#8b90a0;cursor:pointer;font-size:15px;line-height:1">×</button>'}</div>
-      <div style="font-size:11px;color:#dfe2ea;line-height:1.35;height:32px;overflow:hidden">${(s.headline||'').replace(/</g,'&lt;').slice(0,42)}</div>
-      <label style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:10.5px;color:#8b90a0">Giây
-        <input type="number" min="2" max="10" step="1" value="${Math.round(s.duration)}" class="cc-dur" style="width:44px;background:#0e0f13;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:4px;color:#eef0f5"></label>`;
-    c.addEventListener('dragstart',()=>{dragIdx=i;c.style.opacity='.4';});
-    c.addEventListener('dragend',()=>{c.style.opacity='1';});
-    c.addEventListener('dragover',e=>e.preventDefault());
-    c.addEventListener('drop',e=>{e.preventDefault();if(dragIdx===null||dragIdx===i)return;const m=capcutState.splice(dragIdx,1)[0];capcutState.splice(i,0,m);dragIdx=null;renderCapcut();});
-    const del=c.querySelector('.cc-del'); if(del)del.onclick=()=>{capcutState.splice(i,1);renderCapcut();};
-    c.querySelector('.cc-dur').onchange=e=>{s.duration=Math.max(2,Math.min(10,Number(e.target.value)||6));};
-    list.appendChild(c);
-  });
+function setEditing(on){
+  editing=on;
+  const show=(id,disp)=>{const el=document.getElementById(id);el.hidden=!on;el.style.display=on?disp:'none';};
+  show('tl-save','inline-flex');show('tl-cancel','inline-flex');show('tl-hint','inline');
+  document.getElementById('edit-toggle-lab').textContent=on?'Đóng chỉnh sửa':'Chỉnh sửa';
+  const et=document.getElementById('edit-toggle');et.style.marginRight=on?'0':'auto';
+  if(!on)segState=JSON.parse(JSON.stringify(origState));  // toggle-off = huỷ thay đổi chưa lưu
+  if(player.duration&&isFinite(player.duration))layoutTimeline(player.duration);
 }
-document.getElementById('capcut-save').onclick=async()=>{
-  const msg=document.getElementById('capcut-msg'); const btn=document.getElementById('capcut-save');
-  if(!capcutState.length){msg.textContent='Giữ lại ít nhất một cảnh.';return;}
-  btn.disabled=true; msg.textContent='Đang ghép lại video…';
-  const items=capcutState.map(s=>({position:s.position, trim:s.duration}));
+document.getElementById('tl-cancel').onclick=()=>setEditing(false);
+document.getElementById('tl-save').onclick=async()=>{
+  const btn=document.getElementById('tl-save');
+  if(!segState.filter(s=>s.kind!=='poster_cta').length){showToast('Giữ lại ít nhất một cảnh.');return;}
+  btn.disabled=true;showToast('<span class="mini-spin"></span> Đang ghép lại video (0đ)…',60000);
+  const items=segState.map(s=>({position:s.position,trim:s.duration}));
   try{
     const r=await fetch(`/video/${videoId}/reassemble`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
     const d=await r.json().catch(()=>({}));
-    if(r.ok){msg.textContent='Đã cập nhật timeline.';showToast('Đã ghép lại video.');refreshPlayer();}
-    else msg.textContent='Lỗi: '+((d&&d.detail)||'thử lại');
-  }catch(e){msg.textContent='Lỗi kết nối.';}
+    if(r.ok){
+      let acc=0;segState.forEach(s=>{s.origDur=s.duration;s.origStart=acc;acc+=s.duration;});
+      origState=JSON.parse(JSON.stringify(segState));
+      showToast('Đã ghép lại video.');editing=false;setEditing(false);refreshPlayer();
+    }else showToast('Lỗi: '+((d&&d.detail)||'thử lại'),5000);
+  }catch(e){showToast('Lỗi kết nối.',4000);}
   finally{btn.disabled=false;}
 };
 </script>
