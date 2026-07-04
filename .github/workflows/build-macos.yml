@@ -50,26 +50,24 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.7.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.8.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.6.7.dmg
+          path: dist/RETI-Studio-1.6.8.dmg
 
-      - name: Publish to release v1.6.7
+      - name: Publish to release v1.6.8
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.7
-          name: RETI Studio 1.6.7
-          files: dist/RETI-Studio-1.6.7.dmg
+          tag_name: v1.6.8
+          name: RETI Studio 1.6.8
+          files: dist/RETI-Studio-1.6.8.dmg
           body: |
-            Bản 1.6.7 — MƯỢT & NHANH hơn hẳn: giữ kết nối máy chủ (hết trễ mỗi lần bấm),
-            video lưu đệm trên máy (mở lại/tua tức thì, đo nhanh gấp ~50 lần), thumbnail
-            timeline nhẹ (hết khựng khi mở video). CHỈNH SỬA KIỂU CAPCUT ngay TRÊN timeline:
-            kéo mép phải để cắt giây, kéo cả khối để đổi thứ tự, bấm × để xoá — không còn
-            panel thẻ chiếm chỗ. Máy chủ render cũng được hạ ưu tiên CPU để máy không lag
-            khi đang dựng video.
+            Bản 1.6.8 — ĐỒNG BỘ DRIVE dễ dùng: mỗi folder có ô tick, "Chọn tất cả", một nút
+            "Đồng bộ folder đã chọn"; folder đã đồng bộ hiện badge ✓ số ảnh và luôn hiển thị
+            khi mở lại (không phải bấm Đồng bộ lại). Chống trùng ảnh khi đồng bộ chồng; tải
+            được cả ảnh render dung lượng lớn (>10MB) mà trước đây bị Drive chặn.
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`

@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.6.7"
+CLIENT_VERSION = "1.6.8"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 # ---- shared HTTP pool ------------------------------------------------------
@@ -407,6 +407,14 @@ async def project_drive_import_one(project_id: int, file_id: str = Form(...), na
     async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/import-one",
                               data={"file_id": file_id, "name": name}, headers=_headers())
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/projects/{project_id}/drive/mark-synced")
+async def project_drive_mark_synced(project_id: int, folder_id: str = Form(...), name: str = Form(""), count: int = Form(0)):
+    async with _pooled() as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/drive/mark-synced",
+                              data={"folder_id": folder_id, "name": name, "count": str(count)}, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
 

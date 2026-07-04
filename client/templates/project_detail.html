@@ -18,6 +18,16 @@
   .btn-p{background:linear-gradient(135deg,#ff4657,#ff7a3d);color:#fff}
   .btn-p:disabled{opacity:.5}
   .btn-g{background:rgba(255,255,255,.08);color:#dfe2ea}
+  .dfolders{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+  .dfolder{display:flex;align-items:center;gap:9px;padding:9px 11px;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.10);border-radius:10px;cursor:pointer;transition:.12s;user-select:none}
+  .dfolder:hover{border-color:rgba(255,255,255,.24)}
+  .dfolder.sel{border-color:#ff7a3d;background:rgba(255,122,61,.10)}
+  .dfolder.done{border-color:rgba(74,222,128,.4)}
+  .dfolder input{width:16px;height:16px;accent-color:#ff6b3d;flex:0 0 auto;cursor:pointer}
+  .dfolder .nm{flex:1;min-width:0;font-size:13px;color:#e8eaef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dfolder .cnt{flex:0 0 auto;font-size:10.5px;color:#7de0a6;font-weight:600}
+  .dbar-wrap{height:9px;background:rgba(255,255,255,.1);border-radius:6px;margin-top:10px;overflow:hidden}
+  .dbar{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff4657,#ff9a4d);transition:width .2s}
   .filebtn{position:relative;overflow:hidden}
   .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
   .analysis h4{margin:14px 0 6px;font-size:13px;color:#ff8a5c;text-transform:uppercase;letter-spacing:.04em}
@@ -326,46 +336,113 @@
   const _open=new URLSearchParams(location.search).get('open');
   if(_open)openScript(_open);
 
-  // ---- Google Drive sync ----
+  // ---- Google Drive sync (multi-select, one button, persistent state) ----
   const driveBox=document.getElementById('drive-folders');
-  document.getElementById('drive-sync').onclick=async()=>{
+  let driveFolders=[];          // [{id,name,synced,count,root?}]
+  let driveBusy=false;
+
+  document.getElementById('drive-sync').onclick=()=>loadDriveFolders(true);
+
+  async function loadDriveFolders(showErrors){
     const link=document.getElementById('drive-link').value.trim();
-    if(!link){showToast('Dán link thư mục Drive.');return;}
+    if(!link){if(showErrors)showToast('Dán link thư mục Drive.');return;}
+    if(driveBusy)return;
     driveBox.innerHTML='<div class="muted"><span class="mini-spin" style="display:inline-block;vertical-align:middle"></span> Đang đọc Drive…</div>';
     const {ok,data}=await post(`/projects/${pid}/drive/folders`, {link}, false);
     if(!ok){driveBox.innerHTML='<div class="muted" style="color:#ff8a8a">'+((data&&data.detail)||'Lỗi Drive')+'</div>';return;}
-    const folders=data.subfolders||[];
-    let html='';
-    if(folders.length){
-      html='<div class="muted" style="margin-bottom:8px">Chọn folder dự án để nhập ảnh:</div>';
-      folders.forEach(f=>{html+=`<button class="btn btn-g drive-pick" data-fid="${f.id}" style="margin:0 8px 8px 0">📁 ${(f.name||'').replace(/</g,'&lt;')}</button>`;});
-    }
-    if(data.has_images){html+=`<button class="btn btn-p drive-pick" data-fid="${data.root_folder_id}" style="margin:0 8px 8px 0">Nhập ảnh trong thư mục này →</button>`;}
-    if(!html)html='<div class="muted">Thư mục không có folder con hay ảnh nào.</div>';
-    driveBox.innerHTML=html;
-    driveBox.querySelectorAll('.drive-pick').forEach(b=>b.onclick=()=>driveImport(b.dataset.fid,b));
-  };
-  async function driveImport(fid,btn){
-    btn.disabled=true;btn.textContent='Đang đọc danh sách…';
-    const lr=await post(`/projects/${pid}/drive/list-images`, {folder_id:fid}, false);
-    const imgs=(lr.ok&&lr.data.images)||[];
-    if(!imgs.length){showToast('Thư mục này không có ảnh.');btn.disabled=false;btn.textContent='Nhập ảnh';return;}
-    driveBox.innerHTML='<div class="muted">Đang đồng bộ ảnh: <b id="dprog">0</b>/'+imgs.length+'</div>'+
-      '<div style="height:9px;background:rgba(255,255,255,.1);border-radius:6px;margin-top:8px;overflow:hidden"><i id="dbar" style="display:block;height:100%;width:0;background:linear-gradient(90deg,#ff4657,#ff9a4d);transition:width .2s"></i></div>';
-    let done=0;
-    for(const im of imgs){
-      try{const fd=new FormData();fd.append('file_id',im.id);fd.append('name',im.name||'image.jpg');
-        await fetch(`/projects/${pid}/drive/import-one`,{method:'POST',body:fd});}catch(e){}
-      done++;
-      const dp=document.getElementById('dprog'),db=document.getElementById('dbar');
-      if(dp)dp.textContent=done; if(db)db.style.width=(done/imgs.length*100)+'%';
-    }
-    showToast(`Đã đồng bộ ${done} ảnh từ Drive.`);setTimeout(()=>location.reload(),800);
+    driveFolders=(data.subfolders||[]).map(f=>({id:f.id,name:f.name||'(không tên)',synced:!!f.synced,count:f.count||0,root:false}));
+    if(data.has_images){driveFolders.unshift({id:data.root_folder_id,name:'📄 Ảnh ngay trong thư mục gốc',synced:!!data.root_synced,count:data.root_count||0,root:true});}
+    renderDriveFolders();
   }
-  // If a Drive link was entered when creating the project and no images imported yet,
-  // auto-list the folders so the user can pick right away.
-  if(document.getElementById('drive-link').value.trim() && {{ 'true' if p.image_count == 0 else 'false' }}){
-    document.getElementById('drive-sync').click();
+
+  function renderDriveFolders(){
+    if(!driveFolders.length){driveBox.innerHTML='<div class="muted">Thư mục không có folder con hay ảnh nào.</div>';return;}
+    const anySynced=driveFolders.some(f=>f.synced);
+    let html='<div style="display:flex;align-items:center;gap:12px;margin-bottom:9px">'
+      +'<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;color:#c8ccd4"><input type="checkbox" id="d-all" style="width:16px;height:16px;accent-color:#ff6b3d">Chọn tất cả</label>'
+      +'<span class="muted" id="d-count" style="margin-left:auto"></span></div>';
+    html+='<div class="dfolders" id="d-list"></div>';
+    html+='<div class="dbar-wrap" id="d-prog-wrap" hidden><i class="dbar" id="d-bar"></i></div><div class="muted" id="d-prog" style="margin-top:6px"></div>';
+    html+='<div style="margin-top:12px;display:flex;gap:10px;align-items:center">'
+      +'<button class="btn btn-p" id="d-go" disabled>Đồng bộ folder đã chọn</button>'
+      +(anySynced?'<button class="btn btn-g" id="d-resync" title="Đồng bộ lại các folder đã chọn (bỏ qua ảnh trùng)">Đồng bộ lại</button>':'')
+      +'</div>';
+    driveBox.innerHTML=html;
+    const list=document.getElementById('d-list');
+    driveFolders.forEach((f,i)=>{
+      const el=document.createElement('label');el.className='dfolder'+(f.synced?' done':'');el.dataset.i=i;
+      el.innerHTML=`<input type="checkbox" class="d-cb"><span class="nm">${f.root?'':'📁 '}${f.name.replace(/</g,'&lt;')}</span>`
+        +(f.synced?`<span class="cnt">✓ ${f.count} ảnh</span>`:'');
+      list.appendChild(el);
+    });
+    const cbs=[...driveBox.querySelectorAll('.d-cb')];
+    const refresh=()=>{
+      let n=0;
+      cbs.forEach((cb,i)=>{const on=cb.checked;driveFolders[i]._sel=on;list.children[i].classList.toggle('sel',on);if(on)n++;});
+      const go=document.getElementById('d-go');go.disabled=n===0;go.textContent=n?`Đồng bộ ${n} folder đã chọn`:'Đồng bộ folder đã chọn';
+      const rs=document.getElementById('d-resync');if(rs)rs.style.display=n?'inline-flex':'none';
+      document.getElementById('d-all').checked=n===cbs.length&&n>0;
+      document.getElementById('d-count').textContent=n?`Đã chọn ${n}`:'';
+    };
+    cbs.forEach(cb=>cb.onchange=refresh);
+    document.getElementById('d-all').onchange=e=>{cbs.forEach(cb=>cb.checked=e.target.checked);refresh();};
+    document.getElementById('d-go').onclick=()=>syncSelected(false);
+    const rs=document.getElementById('d-resync');if(rs)rs.onclick=()=>syncSelected(true);
+    refresh();
+  }
+
+  async function syncSelected(reSync){
+    const chosen=driveFolders.filter(f=>f._sel);
+    if(!chosen.length){showToast('Chọn ít nhất một folder.');return;}
+    driveBusy=true;
+    document.getElementById('d-go').disabled=true;
+    const rs=document.getElementById('d-resync');if(rs)rs.disabled=true;
+    const wrap=document.getElementById('d-prog-wrap'),bar=document.getElementById('d-bar'),txt=document.getElementById('d-prog');
+    wrap.hidden=false;
+    // gather image lists first so we can show a real overall %
+    let all=[];
+    for(const f of chosen){
+      txt.textContent=`Đang đọc danh sách "${f.name}"…`;
+      const lr=await post(`/projects/${pid}/drive/list-images`, {folder_id:f.id}, false);
+      const imgs=(lr.ok&&lr.data.images)||[];
+      f._imgs=imgs; all=all.concat(imgs.map(im=>({im,f})));
+    }
+    if(!all.length){txt.textContent='';showToast('Các folder đã chọn không có ảnh.');driveBusy=false;renderDriveFolders();return;}
+    let done=0, added=0;
+    const counts={};
+    for(const {im,f} of all){
+      try{const fd=new FormData();fd.append('file_id',im.id);fd.append('name',im.name||'image.jpg');
+        const r=await fetch(`/projects/${pid}/drive/import-one`,{method:'POST',body:fd});
+        const d=await r.json().catch(()=>({}));if(d&&d.skipped===false)added++;
+      }catch(e){}
+      counts[f.id]=(counts[f.id]||0)+1;
+      done++;
+      bar.style.width=(done/all.length*100)+'%';
+      txt.textContent=`Đang đồng bộ: ${done}/${all.length} ảnh · "${f.name}"`;
+    }
+    // record synced state per folder (count = images seen in that folder)
+    for(const f of chosen){
+      try{const fd=new FormData();fd.append('folder_id',f.id);fd.append('name',f.name);fd.append('count',String((f._imgs||[]).length));
+        await fetch(`/projects/${pid}/drive/mark-synced`,{method:'POST',body:fd});}catch(e){}
+      f.synced=true; f.count=(f._imgs||[]).length; f._sel=false;
+    }
+    driveBusy=false;
+    txt.textContent=`✓ Xong. Thêm ${added} ảnh mới${added<done?` (bỏ qua ${done-added} ảnh đã có)`:''}.`;
+    showToast(`Đã đồng bộ ${chosen.length} folder · +${added} ảnh.`);
+    renderDriveFolders();                 // keep the list, now with ✓ badges
+    updateImageCount(added);
+  }
+
+  function updateImageCount(added){
+    // reflect the new image total in the "Bổ sung hồ sơ & hình ảnh" heading if present
+    const el=document.getElementById('img-count');
+    if(el){el.textContent=(parseInt(el.textContent||'0',10)||0)+added;}
+  }
+
+  // Always show the folder list on load if a Drive link is saved — so synced
+  // folders are visible immediately without pressing Đồng bộ again.
+  if(document.getElementById('drive-link').value.trim()){
+    loadDriveFolders(false);
   }
 </script>
 {% endblock %}
