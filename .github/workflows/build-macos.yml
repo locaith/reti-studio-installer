@@ -50,24 +50,23 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.5.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.6.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.6.5.dmg
+          path: dist/RETI-Studio-1.6.6.dmg
 
-      - name: Publish to release v1.6.5
+      - name: Publish to release v1.6.6
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.5
-          name: RETI Studio 1.6.5
-          files: dist/RETI-Studio-1.6.5.dmg
+          tag_name: v1.6.6
+          name: RETI Studio 1.6.6
+          files: dist/RETI-Studio-1.6.6.dmg
           body: |
-            Bản 1.6.5 — SỬA DỨT ĐIỂM lỗi app mở ra trình duyệt thay vì cửa sổ app. Nguyên nhân:
-            một tệp thư viện hiển thị (WebView2 Core.dll) bị hỏng/rỗng khi đóng gói nên cửa sổ
-            ứng dụng không tạo được → app rơi ra web. Nay đã nhúng lại tệp đúng + ghi log chẩn
-            đoán + nếu vẫn lỗi thì mở ở chế độ "cửa sổ ứng dụng" (không thanh địa chỉ).
+            Bản 1.6.6 — Trình phát TO hơn (video cao ~80% màn hình), timeline thu gọn một nửa
+            (khung hình nhỏ, thước gọn) để nhường chỗ cho video, nút phóng to giờ ép video
+            LẤP ĐẦY màn hình thật sự (kèm đường dự phòng nếu cửa sổ không cho phóng).
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`
