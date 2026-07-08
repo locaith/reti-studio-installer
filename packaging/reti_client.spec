@@ -32,7 +32,15 @@ datas += collect_data_files("certifi")
 
 hiddenimports = []
 hiddenimports += collect_submodules("uvicorn")
-hiddenimports += ["anyio", "h11", "httpx", "httpcore", "certifi", "client.server"]
+# collect_submodules walks the FILESYSTEM, so it bundles every anyio/starlette submodule
+# even if Defender has zeroed an __init__.py at build time (which silently breaks
+# PyInstaller's import-graph analysis -> "No module named 'anyio._core._eventloop'" and the
+# frozen app dies on launch). Belt-and-suspenders after v1.6.9 shipped exactly that crash.
+hiddenimports += collect_submodules("anyio")
+hiddenimports += collect_submodules("starlette")
+hiddenimports += collect_submodules("httpx")
+hiddenimports += collect_submodules("httpcore")
+hiddenimports += ["h11", "certifi", "sniffio", "idna", "client.server"]
 try:
     hiddenimports += collect_submodules("webview")
     datas += collect_data_files("webview")

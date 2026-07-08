@@ -50,22 +50,22 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.9.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.10.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.6.9.dmg
+          path: dist/RETI-Studio-1.6.10.dmg
 
-      - name: Publish to release v1.6.9
+      - name: Publish to release v1.6.10
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.9
-          name: RETI Studio 1.6.9
-          files: dist/RETI-Studio-1.6.9.dmg
+          tag_name: v1.6.10
+          name: RETI Studio 1.6.10
+          files: dist/RETI-Studio-1.6.10.dmg
           body: |
-            Bản 1.6.9 — Thêm hiệu ứng shimmer khi bấm "Nâng cấp prompt": toàn bộ nội dung
+            Bản 1.6.10 — Thêm hiệu ứng shimmer khi bấm "Nâng cấp prompt": toàn bộ nội dung
             prompt loé sáng chạy trong lúc AI viết lại, ô prompt sáng viền và icon lấp lánh —
             cảm giác AI đang nâng cấp prompt.
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
