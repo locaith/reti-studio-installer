@@ -148,13 +148,37 @@
     if (small) small.textContent = uploader.files.length ? `Đã chọn ${uploader.files.length} ảnh` : "JPG, PNG, WEBP";
   });
   // AI enhance: rewrite whatever the user has typed into a stronger prompt.
+  // While the AI works, lay a shimmer overlay exactly over the textarea so the WHOLE
+  // prompt appears to shimmer — the "AI đang nâng cấp prompt" feel.
   document.querySelectorAll("[data-enhance]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const form = btn.closest("form");
       const ta = form.querySelector("textarea[name=prompt]");
       if (!ta || !ta.value.trim()) { ta && ta.focus(); return; }
       const original = ta.value;
+      const box = ta.closest(".prompt-box");
+      let shimmer = null;
+      const startShimmer = () => {
+        if (!box) return;
+        shimmer = document.createElement("div");
+        shimmer.className = "prompt-shimmer";
+        shimmer.textContent = ta.value;
+        shimmer.style.top = ta.offsetTop + "px";
+        shimmer.style.left = ta.offsetLeft + "px";
+        shimmer.style.width = ta.offsetWidth + "px";
+        shimmer.style.height = ta.offsetHeight + "px";
+        box.classList.add("is-enhancing");
+        ta.classList.add("is-enhancing");
+        box.appendChild(shimmer);
+      };
+      const stopShimmer = () => {
+        if (shimmer) { shimmer.remove(); shimmer = null; }
+        if (box) box.classList.remove("is-enhancing");
+        ta.classList.remove("is-enhancing");
+      };
+      startShimmer();
       btn.disabled = true;
+      btn.classList.add("is-enhancing");
       const label = btn.querySelector("svg") ? btn.childNodes[btn.childNodes.length - 1] : null;
       const oldText = label ? label.textContent : "";
       if (label) label.textContent = " Đang nâng cấp…";
@@ -168,7 +192,12 @@
         const d = await r.json();
         if (r.ok && d.prompt) ta.value = d.prompt;
       } catch (e) { /* keep original */ }
-      finally { btn.disabled = false; if (label) label.textContent = oldText; }
+      finally {
+        stopShimmer();
+        btn.disabled = false;
+        btn.classList.remove("is-enhancing");
+        if (label) label.textContent = oldText;
+      }
     });
   });
   // If any video is still processing, refresh — but NEVER while the user is typing
