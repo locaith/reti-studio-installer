@@ -928,6 +928,7 @@ figure img {
   gap: 16px;
 }
 .video-card {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface-2);
@@ -939,6 +940,31 @@ figure img {
   border-color: var(--line-strong);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
+.video-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(8, 9, 12, 0.62);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-3px);
+  backdrop-filter: blur(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.video-card:hover .video-del { opacity: 1; transform: translateY(0); }
+.video-del:hover { background: var(--accent); }
+.video-del:disabled { opacity: 0.5; cursor: default; }
+@media (hover: none) { .video-del { opacity: 1; transform: none; } }
 .video-thumb {
   position: relative;
   aspect-ratio: 16 / 9;

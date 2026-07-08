@@ -50,23 +50,23 @@ jobs:
       - name: Package .dmg
         run: |
           cd dist
-          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.11.dmg"
+          hdiutil create -volname "RETI Studio" -srcfolder "RETI Studio.app" -ov -format UDZO "RETI-Studio-1.6.12.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RETI-Studio-macOS-dmg
-          path: dist/RETI-Studio-1.6.11.dmg
+          path: dist/RETI-Studio-1.6.12.dmg
 
-      - name: Publish to release v1.6.11
+      - name: Publish to release v1.6.12
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.11
-          name: RETI Studio 1.6.11
-          files: dist/RETI-Studio-1.6.11.dmg
+          tag_name: v1.6.12
+          name: RETI Studio 1.6.12
+          files: dist/RETI-Studio-1.6.12.dmg
           body: |
-            Bản 1.6.11 — Sửa lỗi app mở bằng trình duyệt thay vì cửa sổ ứng dụng.
-            Giữ hiệu ứng shimmer khi bấm "Nâng cấp prompt" (toàn bộ prompt loé sáng
-            trong lúc AI viết lại).
+            Bản 1.6.12 — Thêm nút xóa video ở "Video của tôi" (di chuột vào video để
+            hiện nút xóa). Cải thiện chất lượng Ảnh→Video: chuyển động máy quay điện ảnh
+            sống động hơn, ảnh không còn đứng yên.
             macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
             `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`

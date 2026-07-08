@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.6.11"
+CLIENT_VERSION = "1.6.12"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 # ---- shared HTTP pool ------------------------------------------------------
@@ -425,6 +425,17 @@ async def video_reassemble(video_id: int, request: Request):
         r = await client.post(f"{CLOUD_URL}/api/v1/videos/{video_id}/reassemble",
                              json=body, headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.post("/video/{video_id}/delete")
+async def video_delete(video_id: int):
+    async with _pooled() as client:
+        r = await client.delete(f"{CLOUD_URL}/api/v1/videos/{video_id}", headers=_headers())
+    try:
+        data = r.json()
+    except Exception:
+        data = {"ok": r.status_code < 300}
+    return JSONResponse(data, status_code=r.status_code)
 
 
 @app.post("/projects/{project_id}/topics/{topic_id}/script")

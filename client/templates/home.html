@@ -109,6 +109,9 @@
     <div class="video-grid">
       {% for v in videos %}
       <a class="video-card" href="/video/{{ v.id }}">
+        <button class="video-del" type="button" data-del="{{ v.id }}" title="Xóa video" aria-label="Xóa video">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
         <div class="video-thumb" data-ratio="{{ v.aspect_ratio }}">
           {% if v.status == 'completed' %}
             <video class="thumb-video" muted playsinline preload="metadata" src="/video/{{ v.id }}/download#t=2.5"></video>
@@ -200,6 +203,25 @@
       }
     });
   });
+  // Delete a video via the trash button on its card (stop the card link from navigating).
+  document.querySelectorAll("[data-del]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!confirm("Xóa video này? Hành động không thể hoàn tác.")) return;
+      const id = btn.getAttribute("data-del");
+      const card = btn.closest(".video-card");
+      btn.disabled = true;
+      if (card) card.style.opacity = "0.45";
+      try {
+        const r = await fetch(`/video/${id}/delete`, { method: "POST" });
+        if (r.ok) { if (card) card.remove(); }
+        else { if (card) card.style.opacity = ""; btn.disabled = false; alert("Xóa không thành công. Thử lại sau."); }
+      } catch (err) {
+        if (card) card.style.opacity = ""; btn.disabled = false;
+      }
+    });
+  });
+
   // If any video is still processing, refresh — but NEVER while the user is typing
   // a prompt (would wipe their text). Wait until the box is empty & unfocused.
   {% if videos %}
