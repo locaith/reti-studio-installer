@@ -189,8 +189,19 @@ def main() -> int:
     _log(f"server ready={ready}")
 
     if "--selftest" in sys.argv:
-        print(f"CLIENT SELFTEST: {'OK' if ready else 'FAIL'} {url}")
-        return 0 if ready else 1
+        # Also verify the GUI module imports — a missing webview submodule (e.g.
+        # webview.event, which Defender zeroed mid-build in 1.6.10) makes the app
+        # silently fall back to opening in a browser. The plain server check misses it.
+        wv_ok = True
+        try:
+            import webview  # noqa: F401
+            import webview.event  # noqa: F401
+        except Exception as exc:
+            wv_ok = False
+            _log(f"selftest: webview import FAILED: {exc!r}")
+        ok = ready and wv_ok
+        print(f"CLIENT SELFTEST: {'OK' if ok else 'FAIL'} server={ready} webview={wv_ok} {url}")
+        return 0 if ok else 1
 
     try:
         import webview
