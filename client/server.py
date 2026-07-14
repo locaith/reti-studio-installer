@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.6.12"
+CLIENT_VERSION = "1.6.13"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 # ---- shared HTTP pool ------------------------------------------------------
@@ -140,6 +140,25 @@ app.mount("/static", StaticFiles(directory=str(_resource_dir() / "static")), nam
 
 def _headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {load_token()}"}
+
+
+async def _me_or_none():
+    """Fetch the current customer (name/budget/remaining) or None if not activated/reachable."""
+    if not load_token():
+        return None
+    try:
+        async with _pooled() as client:
+            r = await client.get(f"{CLOUD_URL}/api/v1/me", headers=_headers())
+        return r.json() if r.status_code == 200 else None
+    except Exception:
+        return None
+
+
+def _safe_body(r):
+    try:
+        return r.json()
+    except Exception:
+        return {"detail": "Lỗi máy chủ."}
 
 
 @app.get("/health")
@@ -456,11 +475,38 @@ async def project_save_script(project_id: int, topic_id: int, request: Request):
 
 
 @app.post("/projects/{project_id}/topics/{topic_id}/produce")
-async def project_produce(project_id: int, topic_id: int, aspect_ratio: str = Form("16:9"), quality: str = Form("standard")):
+async def project_produce(project_id: int, topic_id: int, aspect_ratio: str = Form("16:9"),
+                          quality: str = Form("standard"), video_style: str = Form("cinematic")):
     async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/produce",
-                              data={"aspect_ratio": aspect_ratio, "quality": quality}, headers=_headers())
+                              data={"aspect_ratio": aspect_ratio, "quality": quality, "video_style": video_style},
+                              headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.get("/tao-tvc", response_class=HTMLResponse)
+async def protvc_page(request: Request):
+    me = await _me_or_none()
+    if me is None:
+        return templates.TemplateResponse(request, "setup.html", {"cloud": CLOUD_URL, "error": None})
+    return templates.TemplateResponse(request, "protvc.html", {"me": me})
+
+
+@app.post("/protvc/create")
+async def protvc_create(drive_link: str = Form(...), name: str = Form("")):
+    """One-button flow: create a project (with the Drive link) + one TVC topic, return ids."""
+    proj_name = (name or "").strip() or "Dự án TVC"
+    async with _pooled() as client:
+        pr = await client.post(f"{CLOUD_URL}/api/v1/projects",
+                               data={"name": proj_name, "drive_link": drive_link}, headers=_headers())
+        if pr.status_code != 200:
+            return JSONResponse(_safe_body(pr), status_code=pr.status_code)
+        pid = pr.json().get("id")
+        tr = await client.post(f"{CLOUD_URL}/api/v1/projects/{pid}/topics",
+                               data={"title": "TVC dự án", "angle": ""}, headers=_headers())
+        if tr.status_code != 200:
+            return JSONResponse(_safe_body(tr), status_code=tr.status_code)
+    return JSONResponse({"project_id": pid, "topic_id": tr.json().get("id")})
 
 
 @app.post("/projects/{project_id}/delete")

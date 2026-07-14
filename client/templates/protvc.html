@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block foot %}
+<div class="quota-chip"><strong>${{ '%.2f'|format(me.remaining) }}</strong><span>số dư còn lại</span></div>
+{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <div><p class="eyebrow">RETI Studio</p><h1 class="topbar-title">Tạo TVC chuyên nghiệp</h1></div>
+</header>
+
+<!-- PHASE A: IMPORT -->
+<section class="composer" id="import-panel">
+  <div class="composer-glow" aria-hidden="true"></div>
+  <div style="position:relative;z-index:1">
+    <h2 style="margin:0 0 4px;font-size:19px;font-weight:800">Dán link Google Drive để bắt đầu</h2>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:14px">AI đọc ảnh + tài liệu trong thư mục, tự hiểu dự án. Bạn không phải điền gì.</p>
+    <div class="prompt-box" style="display:flex;gap:8px;align-items:center;padding:8px">
+      <input id="drive-link" type="url" placeholder="https://drive.google.com/drive/folders/..." style="flex:1;border:0;background:transparent;color:var(--ink);font:inherit;font-size:15px;padding:8px 10px;outline:none">
+      <button class="generate-btn" id="btn-import" type="button">Nhập dữ liệu
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <div id="import-prog" hidden style="margin-top:14px">
+      <div class="muted" id="import-msg" style="margin-bottom:8px;font-size:13px"></div>
+      <div style="height:8px;background:rgba(255,255,255,.1);border-radius:6px;overflow:hidden"><i id="import-bar" style="display:block;height:100%;width:5%;background:var(--accent-grad);transition:width .4s"></i></div>
+    </div>
+  </div>
+</section>
+
+<!-- PHASE B: EDITOR (2-pane) -->
+<section id="editor" hidden>
+  <div class="ptvc-editor">
+    <!-- LEFT: preview -->
+    <div class="ptvc-pcol">
+      <div class="preview" id="pv">
+        <div class="pscene" id="scene"></div>
+        <div class="pgrade" id="grade"></div>
+        <div class="pvig"></div>
+        <div class="pbadge" id="badge">16:9 · 30s</div>
+        <div class="plogo" id="plogo">R</div>
+        <div class="ptext"><div class="paccent"></div><h2 class="phead" id="hl">THE PARKLAND</h2><p class="psub" id="hsub">Kiệt tác — đẳng cấp sống thượng lưu</p></div>
+        <div class="peq"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="ppbar"><i style="width:32%"></i></div>
+      </div>
+      <p class="pcap">▶ Video mẫu · đổi lựa chọn bên phải, cập nhật <b>ngay</b></p>
+    </div>
+
+    <!-- RIGHT: controls -->
+    <div class="ptvc-ccol">
+      <div class="step done"><div class="snum">✓</div><h3>Nguồn dữ liệu</h3>
+        <div class="okpill" id="data-pill">✓ Đã nhập dữ liệu</div>
+      </div>
+
+      <div class="step done"><div class="snum">✓</div><h3>Ảnh dự án</h3>
+        <div class="okpill" id="img-pill">AI sẽ tự chọn cảnh đẹp &amp; đa dạng nhất</div>
+      </div>
+
+      <div class="step"><div class="snum">3</div><h3>Phong cách &amp; định dạng</h3>
+        <h4 class="gl">Tỉ lệ khung hình</h4>
+        <div class="chips" id="aspect"><div class="chip sel" data-a="16:9">16:9 Ngang</div><div class="chip" data-a="9:16">9:16 Dọc</div></div>
+        <h4 class="gl">Thời lượng</h4>
+        <div class="chips" id="dur"><div class="chip" data-d="16">16s</div><div class="chip sel" data-d="30">30s</div><div class="chip" data-d="45">45s</div><div class="chip" data-d="60">60s</div></div>
+        <h4 class="gl">Phong cách hình ảnh <em>8 kiểu</em></h4>
+        <div class="grid" id="styles"></div>
+        <h4 class="gl">Kiểu chữ tiêu đề <em>6 kiểu</em></h4>
+        <div class="grid" id="fonts"></div>
+        <h4 class="gl">Nhạc nền <em>để trống → AI tự tạo · kho &amp; upload sắp có</em></h4>
+        <div class="mrow" id="music"></div>
+      </div>
+
+      <div class="review">⚡ Bấm xong, AI viết kịch bản ~30 giây → bạn liếc/sửa nhanh → mới dựng phim (tránh tốn phí render nhầm).</div>
+      <button class="cta" id="btn-create">✨ Tạo TVC chuyên nghiệp</button>
+      <p class="foot">AI tự <b>viết kịch bản</b>, <b>chọn cảnh</b>, <b>chuyển cảnh mượt</b>, <b>lồng nhạc &amp; phụ đề</b> theo phong cách bạn chọn.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SCRIPT REVIEW MODAL -->
+<div class="modal" id="review-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><h3>Kịch bản AI đề xuất</h3><button class="xbtn" id="review-close">✕</button></div>
+    <div class="modal-body" id="review-body"></div>
+    <div class="modal-foot">
+      <button class="ghost" id="review-regen">↻ Viết lại</button>
+      <button class="cta" style="height:46px;font-size:15px;margin:0;flex:1" id="review-produce">✓ Duyệt &amp; dựng video</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="/static/protvc.css">
+<script src="/static/protvc.js"></script>
+{% endblock %}
