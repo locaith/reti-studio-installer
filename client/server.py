@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.6.13"
+CLIENT_VERSION = "1.6.14"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 # ---- shared HTTP pool ------------------------------------------------------
@@ -476,10 +476,12 @@ async def project_save_script(project_id: int, topic_id: int, request: Request):
 
 @app.post("/projects/{project_id}/topics/{topic_id}/produce")
 async def project_produce(project_id: int, topic_id: int, aspect_ratio: str = Form("16:9"),
-                          quality: str = Form("standard"), video_style: str = Form("cinematic")):
+                          quality: str = Form("standard"), video_style: str = Form("cinematic"),
+                          music_url: str = Form(""), music_attr: str = Form("")):
     async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/produce",
-                              data={"aspect_ratio": aspect_ratio, "quality": quality, "video_style": video_style},
+                              data={"aspect_ratio": aspect_ratio, "quality": quality, "video_style": video_style,
+                                    "music_url": music_url, "music_attr": music_attr},
                               headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
@@ -490,6 +492,14 @@ async def protvc_page(request: Request):
     if me is None:
         return templates.TemplateResponse(request, "setup.html", {"cloud": CLOUD_URL, "error": None})
     return templates.TemplateResponse(request, "protvc.html", {"me": me})
+
+
+@app.get("/music/search")
+async def music_search(q: str = "", mood: str = "", limit: int = 30):
+    async with _pooled() as client:
+        r = await client.get(f"{CLOUD_URL}/api/v1/music/search",
+                             params={"q": q, "mood": mood, "limit": limit}, headers=_headers())
+    return JSONResponse(_safe_body(r), status_code=r.status_code)
 
 
 @app.post("/protvc/create")

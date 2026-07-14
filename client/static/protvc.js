@@ -27,7 +27,7 @@
     { t:'Thư giãn', d:'Lofi', sp:.9 }, { t:'Kịch tính', d:'Trailer', sp:.5 },
     { t:'Bay bổng', d:'Ambient', sp:1.1 }, { t:'Tự hào', d:'Orchestra', sp:.65 }
   ];
-  var S = { pid:null, tid:null, style:0, font:1, music:0, aspect:'16:9', dur:30, script:null };
+  var S = { pid:null, tid:null, style:0, font:1, music:0, aspect:'16:9', dur:30, quality:'standard', musicUrl:'', script:null };
 
   /* ---------- build preset cards ---------- */
   var sc = $('#styles');
@@ -45,34 +45,98 @@
     el.onclick = function () { one(fc, el); S.font = i; apply(); };
     fc.appendChild(el);
   });
-  var mc = $('#music');
-  MUSIC.forEach(function (m, i) {
-    var el = document.createElement('div'); el.className = 'mcard' + (i === 0 ? ' sel' : '');
-    var h = ''; for (var k = 0; k < 18; k++) h += '<i style="height:' + (20 + Math.abs(Math.sin(k * 1.3 + i)) * 70) + '%"></i>';
-    el.innerHTML = '<div class="mplay">▶</div><div class="wave">' + h + '</div><div class="mmeta"><div class="t">' + m.t + '</div><div class="d">' + m.d + '</div></div>';
-    el.onclick = function () { one(mc, el, 'mcard'); S.music = i; apply(); };
-    mc.appendChild(el);
-  });
   document.querySelectorAll('#aspect .chip').forEach(function (c) { c.onclick = function () { one($('#aspect'), c); S.aspect = c.dataset.a; apply(); }; });
   document.querySelectorAll('#dur .chip').forEach(function (c) { c.onclick = function () { one($('#dur'), c); S.dur = +c.dataset.d; apply(); }; });
+  document.querySelectorAll('#quality .chip').forEach(function (c) { c.onclick = function () { one($('#quality'), c); S.quality = c.dataset.q; }; });
 
   function one(cont, el, cls) {
     cont.querySelectorAll('.' + (cls || 'card') + ', .chip').forEach(function (x) { x.classList.remove('sel'); });
     el.classList.add('sel');
   }
   function apply() {
-    var s = STYLES[S.style], f = FONTS[S.font], m = MUSIC[S.music];
+    var s = STYLES[S.style], f = FONTS[S.font];
     document.documentElement.style.setProperty('--accent', s.ac);
-    $('#grade').style.background = s.g; $('#scene').style.filter = s.fl;
+    $('#grade').style.background = s.g;
+    var vid = $('#pvid'); if (vid) vid.style.filter = s.fl;
     var hl = $('#hl');
     hl.style.fontFamily = f.ff; hl.style.fontStyle = f.it; hl.style.fontWeight = f.w;
     hl.style.letterSpacing = f.ls; hl.style.textTransform = f.up ? 'uppercase' : 'none';
     hl.textContent = f.up ? 'THE PARKLAND' : 'The Parkland';
     $('#badge').textContent = S.aspect + ' · ' + S.dur + 's';
     $('#pv').classList.toggle('vert', S.aspect === '9:16');
-    document.querySelectorAll('.peq i').forEach(function (b) { b.style.animationDuration = m.sp + 's'; });
   }
   apply();
+
+  /* ---------- real video preview: play sample clip + chosen music ---------- */
+  var pvid = $('#pvid'), paudio = $('#paudio'), pv = $('#pv'), pplay = $('#pplay'), pfill = $('#pfill'), pcap = $('#pcap');
+  pvid.src = '/static/sample-preview.mp4';
+  function togglePlay() {
+    if (pvid.paused) {
+      pvid.play().catch(function () {});
+      if (S.musicUrl) { try { paudio.currentTime = 0; paudio.play().catch(function () {}); } catch (e) {} }
+      pv.classList.add('playing'); if (pcap) pcap.innerHTML = '⏸ Đang phát video mẫu · đổi lựa chọn để xem khác biệt';
+    } else {
+      pvid.pause(); paudio.pause(); pv.classList.remove('playing');
+      if (pcap) pcap.innerHTML = '▶ Bấm để xem thử · đổi phong cách/font/nhạc → video mẫu đổi <b>trực tiếp</b>';
+    }
+  }
+  pplay.onclick = togglePlay;
+  pvid.onclick = function () { if (pv.classList.contains('playing')) togglePlay(); };
+  pvid.ontimeupdate = function () { if (pvid.duration && pfill) pfill.style.width = (pvid.currentTime / pvid.duration * 100) + '%'; };
+
+  /* ---------- music picker modal (Openverse library) ---------- */
+  var mModal = $('#music-modal'), mList = $('#music-list'), mQ = $('#music-q');
+  var mAudio = new Audio(); mAudio.preload = 'none'; var mNowRow = null, mNowBtn = null;
+  var mMood = 'epic', mTimer = null;
+  $('#music-pick').onclick = function () { mModal.hidden = false; if (!mList.querySelector('.trk')) loadMusic(); };
+  $('#music-close').onclick = function () { stopPrev(); mModal.hidden = true; };
+  $('#music-ai').onclick = function () {
+    S.musicUrl = ''; S.musicDownload = ''; S.musicName = ''; S.musicAttr = '';
+    $('#mp-name').textContent = 'AI tự tạo nhạc theo phong cách';
+    $('#mp-sub').textContent = 'Nhấn để chọn từ kho nhạc'; $('#mp-ico').innerHTML = '♪';
+    if (paudio) { paudio.pause(); paudio.removeAttribute('src'); }
+    stopPrev(); mModal.hidden = true;
+  };
+  document.querySelectorAll('#music-moods .chip').forEach(function (c) {
+    c.onclick = function () { one($('#music-moods'), c); mMood = c.dataset.m; loadMusic(); };
+  });
+  mQ.oninput = function () { clearTimeout(mTimer); mTimer = setTimeout(loadMusic, 400); };
+  function stopPrev() { mAudio.pause(); if (mNowRow) mNowRow.classList.remove('playing'); if (mNowBtn) mNowBtn.textContent = '▶'; mNowRow = null; mNowBtn = null; }
+  function loadMusic() {
+    stopPrev(); mList.innerHTML = '<div class="music-empty">Đang tải kho nhạc…</div>';
+    var url = '/music/search?mood=' + encodeURIComponent(mMood) + '&q=' + encodeURIComponent(mQ.value.trim()) + '&limit=30';
+    fetch(url).then(function (r) { return r.json(); }).then(function (d) {
+      var tracks = (d && d.tracks) || [];
+      if (!tracks.length) { mList.innerHTML = '<div class="music-empty">Không thấy bài phù hợp. Thử mood/từ khoá khác.</div>'; return; }
+      mList.innerHTML = '';
+      tracks.forEach(function (t) {
+        var row = document.createElement('div'); row.className = 'trk';
+        var dur = t.duration ? Math.floor(t.duration / 60) + ':' + ('0' + (t.duration % 60)).slice(-2) : '';
+        row.innerHTML = (t.image ? '<img class="cover" src="' + t.image + '" loading="lazy" alt="">' : '<div class="cover"></div>')
+          + '<button class="tplay" type="button">▶</button>'
+          + '<div class="tmeta"><div class="tn">' + esc(t.name) + '</div><div class="ta">' + esc(t.artist) + '</div></div>'
+          + '<div class="tdur">' + dur + '</div>';
+        var btn = row.querySelector('.tplay');
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          if (mNowRow === row) { stopPrev(); return; }
+          stopPrev(); mAudio.src = t.audio; mAudio.play().catch(function () {});
+          row.classList.add('playing'); btn.textContent = '⏸'; mNowRow = row; mNowBtn = btn;
+        };
+        row.onclick = function () { selectTrack(t, row); };
+        mList.appendChild(row);
+      });
+    }).catch(function () { mList.innerHTML = '<div class="music-empty">Lỗi tải kho nhạc.</div>'; });
+  }
+  function selectTrack(t, row) {
+    mList.querySelectorAll('.trk').forEach(function (x) { x.classList.remove('sel'); });
+    row.classList.add('sel');
+    S.musicUrl = t.audio; S.musicDownload = t.download || t.audio; S.musicName = t.name; S.musicAttr = t.attribution || '';
+    $('#mp-name').textContent = t.name; $('#mp-sub').textContent = t.artist || 'Đã chọn từ kho nhạc';
+    $('#mp-ico').innerHTML = t.image ? '<img src="' + t.image + '" alt="">' : '♪';
+    if (paudio) { paudio.src = t.audio; }
+    stopPrev(); mModal.hidden = true;
+  }
 
   /* ---------- helpers ---------- */
   function form(obj) { var fd = new FormData(); for (var k in obj) fd.append(k, obj[k]); return fd; }
@@ -172,7 +236,8 @@
   $('#review-produce').onclick = function () {
     var b = this; if (b.disabled) return; b.disabled = true; b.textContent = 'Đang khởi tạo dựng phim…';
     post('/projects/' + S.pid + '/topics/' + S.tid + '/produce',
-      { aspect_ratio: S.aspect, quality: 'standard', video_style: STYLES[S.style].k }
+      { aspect_ratio: S.aspect, quality: S.quality, video_style: STYLES[S.style].k,
+        music_url: S.musicDownload || '', music_attr: S.musicAttr || '' }
     ).then(function (r) {
       if (!r.ok || !r.data.video_id) throw new Error((r.data && r.data.detail) || 'Không dựng được video.');
       location.href = '/video/' + r.data.video_id;

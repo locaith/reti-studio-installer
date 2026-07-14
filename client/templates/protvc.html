@@ -33,6 +33,7 @@
     <!-- LEFT: preview -->
     <div class="ptvc-pcol">
       <div class="preview" id="pv">
+        <video class="pvid" id="pvid" muted loop playsinline preload="auto" poster=""></video>
         <div class="pscene" id="scene"></div>
         <div class="pgrade" id="grade"></div>
         <div class="pvig"></div>
@@ -40,9 +41,13 @@
         <div class="plogo" id="plogo">R</div>
         <div class="ptext"><div class="paccent"></div><h2 class="phead" id="hl">THE PARKLAND</h2><p class="psub" id="hsub">Kiệt tác — đẳng cấp sống thượng lưu</p></div>
         <div class="peq"><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="ppbar"><i style="width:32%"></i></div>
+        <button class="pplay" id="pplay" type="button" aria-label="Phát video mẫu">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <div class="ppbar"><i id="pfill" style="width:0%"></i></div>
       </div>
-      <p class="pcap">▶ Video mẫu · đổi lựa chọn bên phải, cập nhật <b>ngay</b></p>
+      <p class="pcap" id="pcap">▶ Bấm để xem thử · đổi phong cách/font/nhạc → video mẫu đổi <b>trực tiếp</b></p>
+      <audio id="paudio" loop preload="none"></audio>
     </div>
 
     <!-- RIGHT: controls -->
@@ -60,12 +65,18 @@
         <div class="chips" id="aspect"><div class="chip sel" data-a="16:9">16:9 Ngang</div><div class="chip" data-a="9:16">9:16 Dọc</div></div>
         <h4 class="gl">Thời lượng</h4>
         <div class="chips" id="dur"><div class="chip" data-d="16">16s</div><div class="chip sel" data-d="30">30s</div><div class="chip" data-d="45">45s</div><div class="chip" data-d="60">60s</div></div>
+        <h4 class="gl">Chất lượng</h4>
+        <div class="chips" id="quality"><div class="chip sel" data-q="standard">HD 720p</div><div class="chip" data-q="high">Full HD 1080p</div></div>
         <h4 class="gl">Phong cách hình ảnh <em>8 kiểu</em></h4>
         <div class="grid" id="styles"></div>
         <h4 class="gl">Kiểu chữ tiêu đề <em>6 kiểu</em></h4>
         <div class="grid" id="fonts"></div>
-        <h4 class="gl">Nhạc nền <em>để trống → AI tự tạo · kho &amp; upload sắp có</em></h4>
-        <div class="mrow" id="music"></div>
+        <h4 class="gl">Nhạc nền <em>kho dùng-thương-mại · nghe thử · hoặc AI tự tạo</em></h4>
+        <button class="music-pick" id="music-pick" type="button">
+          <span class="mp-ico" id="mp-ico">♪</span>
+          <span class="mp-text"><b id="mp-name">AI tự tạo nhạc theo phong cách</b><span id="mp-sub">Nhấn để chọn từ kho nhạc</span></span>
+          <span class="mp-cta">Chọn ›</span>
+        </button>
       </div>
 
       <div class="review">⚡ Bấm xong, AI viết kịch bản ~30 giây → bạn liếc/sửa nhanh → mới dựng phim (tránh tốn phí render nhầm).</div>
@@ -74,6 +85,26 @@
     </div>
   </div>
 </section>
+
+<!-- MUSIC PICKER MODAL -->
+<div class="modal" id="music-modal" hidden>
+  <div class="modal-card" style="width:min(560px,100%)">
+    <div class="modal-head"><h3>Chọn nhạc nền</h3><button class="xbtn" id="music-close">✕</button></div>
+    <div class="music-tools">
+      <input id="music-q" placeholder="Tìm nhạc… (piano, epic, corporate…)" autocomplete="off">
+      <div class="chips" id="music-moods">
+        <div class="chip sel" data-m="epic">Hùng tráng</div><div class="chip" data-m="emotional">Cảm xúc</div>
+        <div class="chip" data-m="luxury">Sang trọng</div><div class="chip" data-m="upbeat">Sôi động</div>
+        <div class="chip" data-m="corporate">Doanh nghiệp</div><div class="chip" data-m="relax">Thư giãn</div>
+        <div class="chip" data-m="dramatic">Kịch tính</div><div class="chip" data-m="ambient">Bay bổng</div>
+      </div>
+    </div>
+    <div class="modal-body" id="music-list"><div class="music-empty">Đang tải kho nhạc…</div></div>
+    <div class="modal-foot">
+      <button class="ghost" id="music-ai" style="flex:1">🎹 Để AI tự tạo nhạc (miễn phí)</button>
+    </div>
+  </div>
+</div>
 
 <!-- SCRIPT REVIEW MODAL -->
 <div class="modal" id="review-modal" hidden>

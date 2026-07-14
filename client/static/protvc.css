@@ -11,14 +11,20 @@
 #editor .preview{position:relative;width:auto;max-width:100%;max-height:54vh;aspect-ratio:16/9;margin:0 auto;border-radius:15px;overflow:hidden;border:1px solid var(--line-strong);box-shadow:0 24px 60px rgba(0,0,0,.55);background:#000;transition:max-height .35s ease}
 #editor .preview.vert{aspect-ratio:9/16;max-height:min(62vh,540px)}
 @media(max-width:979px){#editor .preview{max-height:38vh}#editor .preview.vert{max-height:46vh}}
-#editor .pscene{position:absolute;inset:0;background:
+#editor .pvid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;transition:filter .4s ease}
+/* fallback scene shown behind the video until it loads */
+#editor .pscene{position:absolute;inset:0;z-index:0;background:
     radial-gradient(120% 90% at 72% 18%,rgba(255,210,150,.55),transparent 55%),
     radial-gradient(90% 80% at 20% 90%,rgba(30,50,90,.6),transparent 60%),
     linear-gradient(160deg,#2a3350 0%,#5a4636 55%,#8a6a44 100%);
   animation:ptkb 14s ease-in-out infinite alternate;transform-origin:60% 40%}
-#editor .pscene::after{content:"";position:absolute;left:0;right:0;bottom:0;height:24%;background:linear-gradient(90deg,rgba(10,12,20,.9),rgba(30,40,70,.5) 40%,transparent);clip-path:polygon(0 60%,18% 30%,30% 55%,45% 20%,60% 48%,78% 15%,100% 45%,100% 100%,0 100%);opacity:.5}
-#editor .pgrade{position:absolute;inset:0;mix-blend-mode:overlay;transition:background .4s;pointer-events:none}
-#editor .pvig{position:absolute;inset:0;background:radial-gradient(120% 100% at 50% 40%,transparent 55%,rgba(0,0,0,.55));pointer-events:none}
+#editor .pplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:4;width:60px;height:60px;border-radius:50%;border:0;cursor:pointer;background:rgba(255,59,78,.92);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(0,0,0,.45);transition:opacity .2s,transform .15s}
+#editor .pplay:hover{transform:translate(-50%,-50%) scale(1.06)}
+#editor .pplay svg{margin-left:3px}
+#editor .preview.playing .pplay{opacity:0;pointer-events:none}
+#editor .preview.playing:hover .pplay{opacity:.85;pointer-events:auto}
+#editor .pgrade{position:absolute;inset:0;z-index:2;mix-blend-mode:overlay;transition:background .4s;pointer-events:none}
+#editor .pvig{position:absolute;inset:0;z-index:2;background:radial-gradient(120% 100% at 50% 40%,transparent 55%,rgba(0,0,0,.55));pointer-events:none}
 #editor .ptext{position:absolute;left:18px;right:18px;bottom:18px;z-index:3}
 #editor .paccent{width:42px;height:4px;border-radius:3px;background:var(--accent-grad);margin-bottom:10px;box-shadow:0 0 16px rgba(255,90,70,.6)}
 #editor .phead{font-size:clamp(20px,4.2vw,36px);line-height:1.05;color:#fff;text-shadow:0 3px 20px rgba(0,0,0,.6);margin:0;text-wrap:balance;animation:ptrise 5s ease-in-out infinite}
@@ -82,6 +88,35 @@
 #editor .cta{width:100%;height:54px;border:0;border-radius:15px;background:var(--accent-grad);color:#fff;font:inherit;font-weight:900;font-size:16px;cursor:pointer;box-shadow:0 16px 40px rgba(255,59,78,.34);display:flex;align-items:center;justify-content:center;gap:9px;transition:opacity .15s}
 #editor .cta:disabled{opacity:.55;cursor:default}
 #editor .foot{text-align:center;color:var(--muted);font-size:12px;margin-top:11px;line-height:1.6}#editor .foot b{color:var(--ink)}
+
+/* ===== music picker ===== */
+#editor .music-pick{width:100%;display:flex;align-items:center;gap:11px;border:1.5px solid var(--line-strong);border-radius:12px;background:var(--surface-2);padding:10px 12px;cursor:pointer;text-align:left;color:var(--ink);font:inherit}
+#editor .music-pick:hover{border-color:rgba(255,255,255,.22)}
+#editor .music-pick .mp-ico{flex:0 0 38px;height:38px;border-radius:10px;background:var(--accent-grad);display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;overflow:hidden}
+#editor .music-pick .mp-ico img{width:100%;height:100%;object-fit:cover}
+#editor .music-pick .mp-text{flex:1;min-width:0;display:flex;flex-direction:column}
+#editor .music-pick .mp-text b{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#editor .music-pick .mp-text span{font-size:11px;color:var(--faint)}
+#editor .music-pick .mp-cta{color:var(--accent-2);font-weight:800;font-size:12.5px;flex:0 0 auto}
+
+.music-tools{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+.music-tools input{height:40px;border-radius:11px;border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);font:inherit;font-size:14px;padding:0 12px;outline:none}
+.music-tools input:focus{border-color:rgba(255,59,78,.5)}
+.music-tools .chips{display:flex;gap:6px;flex-wrap:wrap}
+.music-tools .chip{border:1.5px solid var(--line-strong);border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--muted)}
+.music-tools .chip.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+#music-list{gap:6px;min-height:200px}
+.music-empty{color:var(--faint);text-align:center;padding:34px 0;font-size:13px}
+.trk{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:11px;padding:8px 10px;background:var(--surface-2);cursor:pointer;transition:border-color .12s}
+.trk:hover{border-color:var(--line-strong)}
+.trk.sel{border-color:var(--accent);background:var(--accent-soft)}
+.trk .cover{flex:0 0 42px;width:42px;height:42px;border-radius:9px;object-fit:cover;background:var(--surface-3)}
+.trk .tplay{flex:0 0 32px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line-strong);background:var(--surface-3);color:var(--accent-2);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
+.trk.playing .tplay{background:var(--accent-grad);color:#fff;border:0}
+.trk .tmeta{flex:1;min-width:0}
+.trk .tmeta .tn{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trk .tmeta .ta{color:var(--faint);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trk .tdur{color:var(--faint);font-size:11px;font-variant-numeric:tabular-nums;flex:0 0 auto}
 
 /* ===== script review modal ===== */
 .modal{position:fixed;inset:0;z-index:100;background:rgba(4,5,8,.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:18px}
