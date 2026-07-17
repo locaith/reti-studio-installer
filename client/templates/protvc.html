@@ -8,83 +8,109 @@
   <div><p class="eyebrow">RETI Studio</p><h1 class="topbar-title">Tạo TVC chuyên nghiệp</h1></div>
 </header>
 
-<!-- PHASE A: IMPORT -->
-<section class="composer" id="import-panel">
-  <div class="composer-glow" aria-hidden="true"></div>
-  <div style="position:relative;z-index:1">
-    <h2 style="margin:0 0 4px;font-size:19px;font-weight:800">Dán link Google Drive để bắt đầu</h2>
-    <p style="margin:0 0 14px;color:var(--muted);font-size:14px">AI đọc ảnh + tài liệu trong thư mục, tự hiểu dự án. Bạn không phải điền gì.</p>
-    <div class="prompt-box" style="display:flex;gap:8px;align-items:center;padding:8px">
-      <input id="drive-link" type="url" placeholder="https://drive.google.com/drive/folders/..." style="flex:1;border:0;background:transparent;color:var(--ink);font:inherit;font-size:15px;padding:8px 10px;outline:none">
-      <button class="generate-btn" id="btn-import" type="button">Nhập dữ liệu
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </button>
-    </div>
-    <div id="import-prog" hidden style="margin-top:14px">
-      <div class="muted" id="import-msg" style="margin-bottom:8px;font-size:13px"></div>
-      <div style="height:8px;background:rgba(255,255,255,.1);border-radius:6px;overflow:hidden"><i id="import-bar" style="display:block;height:100%;width:5%;background:var(--accent-grad);transition:width .4s"></i></div>
-    </div>
-  </div>
+<!-- STEP RAIL -->
+<div class="ptv-steps" id="steps">
+  <span class="ps on" data-s="1"><i>1</i> Nối Drive</span><span class="pa">›</span>
+  <span class="ps" data-s="2"><i>2</i> Chọn nguyên liệu</span><span class="pa">›</span>
+  <span class="ps" data-s="3"><i>3</i> AI dựng phim</span><span class="pa">›</span>
+  <span class="ps" data-s="4"><i>4</i> Xuất video</span>
+</div>
+
+<!-- DRIVE BAR (always on top) -->
+<section class="ptv-drivebar">
+  <svg class="dbi" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7.7 3h8.6l4.3 7.5-4.3 7.5H7.7L3.4 10.5z" opacity=".45"/><path d="M12 3l4.3 7.5H7.7z"/></svg>
+  <input id="drive-link" type="url" placeholder="Dán link thư mục Google Drive (…/folders/…) rồi bấm Nhập dữ liệu" spellcheck="false">
+  <button class="ptv-import" id="btn-browse" type="button">Nhập dữ liệu
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </button>
 </section>
+<p class="ptv-hint" id="browse-hint">AI đọc ảnh + tài liệu trong thư mục, tự chia ngăn để bạn chọn. Ảnh chỉ tải về khi bạn bấm tạo — nhẹ máy.</p>
+<div class="ptv-busy" id="browse-busy" hidden><span class="spin"></span> <span id="browse-msg">Đang đọc thư mục Drive…</span></div>
 
-<!-- PHASE B: EDITOR (2-pane) -->
-<section id="editor" hidden>
-  <div class="ptvc-editor">
-    <!-- LEFT: preview -->
-    <div class="ptvc-pcol">
-      <div class="preview" id="pv">
-        <video class="pvid" id="pvid" muted loop playsinline preload="auto" poster=""></video>
-        <div class="pscene" id="scene"></div>
-        <div class="pgrade" id="grade"></div>
-        <div class="pvig"></div>
-        <div class="pbadge" id="badge">16:9 · 30s</div>
-        <div class="plogo" id="plogo">R</div>
-        <div class="ptext"><div class="paccent"></div><h2 class="phead" id="hl">THE PARKLAND</h2><p class="psub" id="hsub">Kiệt tác — đẳng cấp sống thượng lưu</p></div>
-        <div class="peq"><i></i><i></i><i></i><i></i><i></i></div>
-        <button class="pplay" id="pplay" type="button" aria-label="Phát video mẫu">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        </button>
-        <div class="ppbar"><i id="pfill" style="width:0%"></i></div>
+<!-- WORKSPACE — always visible: you land INSIDE the desk, the Drive link just fills it -->
+<section id="workspace">
+  <div class="ptv-ws">
+    <!-- bins -->
+    <aside class="ptv-card ptv-bins">
+      <div class="pc-hd"><b>Ngăn nguyên liệu</b></div>
+      <div id="bins"><div class="pbin-empty">Dán link Drive ở trên để ảnh tự chia ngăn vào đây.</div></div>
+    </aside>
+
+    <!-- grid -->
+    <div class="ptv-card ptv-gridwrap">
+      <div class="pc-hd">
+        <b id="grid-title">Tất cả nguyên liệu <span class="mut" id="grid-sub">· AI gợi ý sẵn ảnh cho phim — đổi tuỳ ý</span></b>
+        <div class="pc-tools">
+          <button class="gtool primary" id="pick-auto" type="button">✨ AI chọn lại</button>
+          <button class="gtool" id="pick-all" type="button">Chọn tất cả</button>
+          <button class="gtool" id="pick-none" type="button">Bỏ chọn</button>
+        </div>
       </div>
-      <p class="pcap" id="pcap">▶ Bấm để xem thử · đổi phong cách/font/nhạc → video mẫu đổi <b>trực tiếp</b></p>
-      <audio id="paudio" loop preload="none"></audio>
+      <div class="ptv-grid" id="grid">
+        <div class="ptv-empty">Dán link Drive ở trên → ảnh của dự án hiện ra đây, AI tự chia ngăn &amp; tick sẵn ảnh đẹp.<br><br>
+          <b>Không có Drive cũng được:</b> chỉ cần điền <b>Tên dự án</b> bên phải rồi bấm tạo — AI tự nghiên cứu dự án và dựng toàn bộ cảnh.</div>
+      </div>
     </div>
 
-    <!-- RIGHT: controls -->
-    <div class="ptvc-ccol">
-      <div class="step done"><div class="snum">✓</div><h3>Nguồn dữ liệu</h3>
-        <div class="okpill" id="data-pill">✓ Đã nhập dữ liệu</div>
-      </div>
+    <!-- info + creative options -->
+    <aside class="ptv-card ptv-info">
+      <div class="pc-hd"><b>Thông tin dự án</b></div>
+      <div class="airead" id="airead" hidden><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg> <span id="airead-txt"></span></div>
+      <div class="pfield"><label>Tên dự án</label><input id="f-name" placeholder="VD: The Parkland"></div>
+      <div class="pfield"><label>Mức giá</label><input id="f-price" placeholder="VD: từ 3,2 tỷ / căn"></div>
+      <div class="pfield"><label>Điểm nổi bật</label><textarea id="f-usp" rows="2" placeholder="VD: Resort ven sông · Hồ bơi tràn bờ · Công viên 2ha"></textarea></div>
+      <div class="pfield"><label>Hotline</label><input id="f-hotline" placeholder="VD: 0909 123 456"></div>
 
-      <div class="step done"><div class="snum">✓</div><h3>Ảnh dự án</h3>
-        <div class="okpill" id="img-pill">AI sẽ tự chọn cảnh đẹp &amp; đa dạng nhất</div>
+      <div class="pc-sep"></div>
+      <div class="pfield"><label>Khuôn phim <em>2 trường phái</em></label>
+        <div class="ptv-styles" id="tvcstyle">
+          <div class="pcard sel" data-k="luxury_showcase"><div class="t">Sang trọng Kiến trúc</div><div class="d">Khoe không gian · nhãn tên từng khu</div></div>
+          <div class="pcard" data-k="lifestyle_story"><div class="t">Đời sống Cảm xúc</div><div class="d">Người thật · ít chữ · ấm áp</div></div>
+        </div>
       </div>
-
-      <div class="step"><div class="snum">3</div><h3>Phong cách &amp; định dạng</h3>
-        <h4 class="gl">Tỉ lệ khung hình</h4>
-        <div class="chips" id="aspect"><div class="chip sel" data-a="16:9">16:9 Ngang</div><div class="chip" data-a="9:16">9:16 Dọc</div></div>
-        <h4 class="gl">Thời lượng</h4>
-        <div class="chips" id="dur"><div class="chip" data-d="16">16s</div><div class="chip sel" data-d="30">30s</div><div class="chip" data-d="45">45s</div><div class="chip" data-d="60">60s</div></div>
-        <h4 class="gl">Chất lượng</h4>
-        <div class="chips" id="quality"><div class="chip sel" data-q="standard">HD 720p</div><div class="chip" data-q="high">Full HD 1080p</div></div>
-        <h4 class="gl">Phong cách hình ảnh <em>8 kiểu</em></h4>
-        <div class="grid" id="styles"></div>
-        <h4 class="gl">Kiểu chữ tiêu đề <em>6 kiểu</em></h4>
-        <div class="grid" id="fonts"></div>
-        <h4 class="gl">Nhạc nền <em>kho dùng-thương-mại · nghe thử · hoặc AI tự tạo</em></h4>
+      <div class="pfield"><label>Phong cách hình ảnh <em>8 kiểu</em></label><div class="ptv-styles" id="styles"></div></div>
+      <div class="pfield"><label>Kiểu chữ tiêu đề <em>6 kiểu</em></label><div class="ptv-fonts" id="fonts"></div></div>
+      <div class="pfield"><label>Nhạc nền</label>
         <button class="music-pick" id="music-pick" type="button">
           <span class="mp-ico" id="mp-ico">♪</span>
           <span class="mp-text"><b id="mp-name">AI tự tạo nhạc theo phong cách</b><span id="mp-sub">Nhấn để chọn từ kho nhạc</span></span>
           <span class="mp-cta">Chọn ›</span>
         </button>
       </div>
-
-      <div class="review">⚡ Bấm xong, AI viết kịch bản ~30 giây → bạn liếc/sửa nhanh → mới dựng phim (tránh tốn phí render nhầm).</div>
-      <button class="cta" id="btn-create">✨ Tạo TVC chuyên nghiệp</button>
-      <p class="foot">AI tự <b>viết kịch bản</b>, <b>chọn cảnh</b>, <b>chuyển cảnh mượt</b>, <b>lồng nhạc &amp; phụ đề</b> theo phong cách bạn chọn.</p>
-    </div>
+    </aside>
   </div>
 </section>
+
+<!-- STICKY ACTION BAR — always on: the button is the promise, not a reward for pasting a link -->
+<div class="ptv-action" id="actionbar">
+  <div class="pa-inner">
+    <div class="pa-sum"><b id="sel-count">Đã chọn 0 ảnh</b><small id="sel-sub">Chọn ảnh để bắt đầu</small></div>
+    <div class="pa-opts">
+      <div class="pa-opt"><small>Tỉ lệ</small><div class="miniseg" id="aspect"><button class="ms sel" data-a="16:9">16:9</button><button class="ms" data-a="9:16">9:16</button></div></div>
+      <div class="pa-opt"><small>Thời lượng</small><div class="miniseg" id="dur"><button class="ms sel" data-d="45">45s</button><button class="ms" data-d="60">60s</button><button class="ms" data-d="75">75s</button></div></div>
+      <div class="pa-opt"><small>Chất lượng</small><div class="miniseg" id="quality"><button class="ms sel" data-q="standard">720p</button><button class="ms" data-q="high">1080p</button></div></div>
+      <div class="pa-opt"><small>Phụ đề</small><div class="miniseg" id="subs"><button class="ms sel" data-s="on">Có</button><button class="ms" data-s="off">Không</button></div></div>
+    </div>
+    <button class="ptv-cta" id="btn-create" type="button">
+      <span><span class="k">MỘT CHẠM</span><br>Tạo TVC chuyên nghiệp</span>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- PRODUCE PROGRESS OVERLAY -->
+<div class="ptv-overlay" id="gen-overlay" hidden>
+  <div class="gen-card">
+    <div class="gen-ring"><svg viewBox="0 0 24 24" width="30" height="30" fill="#fff"><path d="M5 3l1.4 3.6L10 8 6.4 9.4 5 13 3.6 9.4 0 8l3.6-1.4z"/></svg></div>
+    <h2 id="gen-title">AI Đạo diễn đang dựng phim…</h2>
+    <p id="gen-msg">Cả ê-kíp gói trong một lượt — biên kịch, quay dựng, hoà âm, ghép mạch.</p>
+    <div class="gen-steps" id="gen-steps">
+      <div class="gs" data-k="import"><i>1</i><span>Nhập ảnh đã chọn</span><b></b></div>
+      <div class="gs" data-k="analyze"><i>2</i><span>AI đọc &amp; hiểu từng ảnh</span><b></b></div>
+      <div class="gs" data-k="script"><i>3</i><span>Viết kịch bản &amp; lời bình</span><b></b></div>
+    </div>
+  </div>
+</div>
 
 <!-- MUSIC PICKER MODAL -->
 <div class="modal" id="music-modal" hidden>

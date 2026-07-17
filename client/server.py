@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 CLOUD_URL = os.environ.get("RETI_CLOUD_URL", "https://video-api.locaith.com").rstrip("/")
-CLIENT_VERSION = "1.6.14"
+CLIENT_VERSION = "1.6.15"
 GITHUB_REPO = "locaith/reti-studio-installer"
 
 # ---- shared HTTP pool ------------------------------------------------------
@@ -458,10 +458,12 @@ async def video_delete(video_id: int):
 
 
 @app.post("/projects/{project_id}/topics/{topic_id}/script")
-async def project_gen_script(project_id: int, topic_id: int, duration_seconds: int = Form(24)):
+async def project_gen_script(project_id: int, topic_id: int, duration_seconds: int = Form(24),
+                             style: str = Form("")):
     async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/script",
-                              data={"duration_seconds": str(duration_seconds)}, headers=_headers())
+                              data={"duration_seconds": str(duration_seconds), "style": style},
+                              headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
 
@@ -477,11 +479,13 @@ async def project_save_script(project_id: int, topic_id: int, request: Request):
 @app.post("/projects/{project_id}/topics/{topic_id}/produce")
 async def project_produce(project_id: int, topic_id: int, aspect_ratio: str = Form("16:9"),
                           quality: str = Form("standard"), video_style: str = Form("cinematic"),
-                          music_url: str = Form(""), music_attr: str = Form("")):
+                          music_url: str = Form(""), music_attr: str = Form(""),
+                          subtitles: str = Form("on")):
     async with _pooled() as client:
         r = await client.post(f"{CLOUD_URL}/api/v1/projects/{project_id}/topics/{topic_id}/produce",
                               data={"aspect_ratio": aspect_ratio, "quality": quality, "video_style": video_style,
-                                    "music_url": music_url, "music_attr": music_attr},
+                                    "music_url": music_url, "music_attr": music_attr,
+                                    "subtitles": subtitles},
                               headers=_headers())
     return JSONResponse(r.json(), status_code=r.status_code)
 
@@ -502,13 +506,28 @@ async def music_search(q: str = "", mood: str = "", limit: int = 30):
     return JSONResponse(_safe_body(r), status_code=r.status_code)
 
 
+@app.post("/drive/browse")
+async def drive_browse(folder_id: str = Form(...)):
+    """List all Drive images grouped into bins (ngăn) for the picker — read-only, no project."""
+    async with _pooled() as client:
+        r = await client.post(f"{CLOUD_URL}/api/v1/drive/browse",
+                              data={"folder_id": folder_id}, headers=_headers())
+    return JSONResponse(_safe_body(r), status_code=r.status_code)
+
+
 @app.post("/protvc/create")
-async def protvc_create(drive_link: str = Form(...), name: str = Form("")):
-    """One-button flow: create a project (with the Drive link) + one TVC topic, return ids."""
+async def protvc_create(drive_link: str = Form(""), name: str = Form(""),
+                        price_note: str = Form(""), usp: str = Form(""), hotline: str = Form("")):
+    """One-button flow: create a project (+ one TVC topic) and return ids.
+
+    drive_link is OPTIONAL: a project with NO Drive folder at all (just a name) is a valid,
+    supported case — the director agent researches it and fills every missing shot with Veo."""
     proj_name = (name or "").strip() or "Dự án TVC"
     async with _pooled() as client:
         pr = await client.post(f"{CLOUD_URL}/api/v1/projects",
-                               data={"name": proj_name, "drive_link": drive_link}, headers=_headers())
+                               data={"name": proj_name, "drive_link": drive_link,
+                                     "price_note": price_note, "usp": usp, "hotline": hotline},
+                               headers=_headers())
         if pr.status_code != 200:
             return JSONResponse(_safe_body(pr), status_code=pr.status_code)
         pid = pr.json().get("id")
