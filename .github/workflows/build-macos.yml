@@ -58,15 +58,12 @@ jobs:
           name: RETI-Studio-macOS-dmg
           path: dist/RETI-Studio-1.6.15.dmg
 
-      - name: Publish to release v1.6.15
+      # NOTE: no `body:` here on purpose. This job only ATTACHES the .dmg. The release notes
+      # are written by hand per release — when this step carried a body it re-stamped every
+      # build with the previous version's feature list, silently overwriting the real notes.
+      - name: Attach macOS build to release v1.6.15
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.6.15
           name: RETI Studio 1.6.15
           files: dist/RETI-Studio-1.6.15.dmg
-          body: |
-            Bản 1.6.15 — "Tạo TVC chuyên nghiệp" đầy đủ hơn: khung xem trước là VIDEO THẬT
-            (bấm play, đổi phong cách/font → video đổi ngay); KHO NHẠC thật (bảng lớn, ảnh bìa,
-            nghe thử, nhạc dùng-thương-mại-hợp-pháp) ghép được vào video; thêm nút Chất lượng 720p/1080p.
-            macOS (.dmg) chưa ký số: mở lần đầu chuột phải > Open, hoặc
-            `xattr -dr com.apple.quarantine "/Applications/RETI Studio.app"`
